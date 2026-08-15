@@ -5,6 +5,7 @@ import { PageHeader, Pill, SectionCard } from "../components/ui-kit";
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui";
 import { useBulkInsert, useRows } from "../lib/data";
 import { GRADE_TYPES, SCHOOL_YEAR, TERMS, TERM_KEYS, fullName, type SchoolClass, type Student, type Subject } from "../lib/types";
+import { apiFetch } from "../lib/api";
 
 export default function OcrGradesPage() {
   const classes = useRows<SchoolClass>("classes", { order: "name", ascending: true });
@@ -28,7 +29,7 @@ export default function OcrGradesPage() {
   const classStudents = useMemo(() => (students.data ?? []).filter((s) => s.class_id === activeClass), [students.data, activeClass]);
 
   useEffect(() => {
-    fetch("/api/ocr")
+    apiFetch("/api/ocr")
       .then((r) => r.json())
       .then((d: { available: boolean }) => setOcrAvailable(d.available))
       .catch(() => {});
@@ -51,7 +52,7 @@ export default function OcrGradesPage() {
     if (!activeClass) return toast.error("Choisissez une classe.");
     setScanning(true);
     try {
-      const res = await fetch("/api/ocr", {
+      const res = await apiFetch("/api/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ classId: activeClass, image: preview }),

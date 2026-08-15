@@ -1203,51 +1203,11 @@ function csrfOk(req) {
 }
 __turbopack_async_result__();
 } catch(e) { __turbopack_async_result__(e); } }, false);}),
-"[project]/src/app/api/auth/logout/route.ts [app-route] (ecmascript)", ((__turbopack_context__) => {
-"use strict";
+"[project]/src/app/api/auth/logout/route.ts [app-route] (ecmascript)", (() => {{
 
-return __turbopack_context__.a(async (__turbopack_handle_async_dependencies__, __turbopack_async_result__) => { try {
+throw new Error("An error occurred while generating the chunk item [project]/src/app/api/auth/logout/route.ts [app-route] (ecmascript)\n\nCaused by:\n- CJS module can't be async.\n\nDebug info:\n- An error occurred while generating the chunk item [project]/src/app/api/auth/logout/route.ts [app-route] (ecmascript)\n- Execution of <EcmascriptModuleAsset as EcmascriptChunkPlaceable>::chunk_item_content failed\n- Execution of EcmascriptChunkItemContent::new failed\n- CJS module can't be async.");
 
-__turbopack_context__.s([
-    "POST",
-    ()=>POST,
-    "dynamic",
-    ()=>dynamic
-]);
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/server.js [app-route] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$auth$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/server/auth.ts [app-route] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$environment$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/server/environment.ts [app-route] (ecmascript)");
-var __turbopack_async_dependencies__ = __turbopack_handle_async_dependencies__([
-    __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$auth$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__
-]);
-[__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$auth$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__] = __turbopack_async_dependencies__.then ? (await __turbopack_async_dependencies__)() : __turbopack_async_dependencies__;
-;
-;
-;
-const dynamic = "force-dynamic";
-async function POST(req) {
-    try {
-        const v = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$auth$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["verifySession"])(req);
-        if (v) {
-            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$auth$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["revokeSession"])(v.sessionId, "logout");
-        }
-        const env = v?.environment ?? (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$environment$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["detectEnvironment"])(req) ?? "production";
-        const res = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-            ok: true
-        });
-        (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$server$2f$auth$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["clearSessionCookie"])(res, env);
-        return res;
-    } catch (error) {
-        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-            ok: false,
-            error: error.message
-        }, {
-            status: 500
-        });
-    }
-}
-__turbopack_async_result__();
-} catch(e) { __turbopack_async_result__(e); } }, false);}),
+}}),
 ];
 
 //# sourceMappingURL=%5Broot-of-the-server%5D__11gzp7m._.js.map

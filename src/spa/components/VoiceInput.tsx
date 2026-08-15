@@ -3,6 +3,7 @@ import { Mic, Square, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui";
 import { cn } from "../lib/utils";
+import { apiFetch } from "../lib/api";
 
 /**
  * Bouton de dictée vocale : enregistre l'audio du micro, l'envoie à
@@ -23,7 +24,7 @@ export function VoiceInput({
   const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
-    fetch("/api/transcribe")
+    apiFetch("/api/transcribe")
       .then((r) => r.json())
       .then((d: { available: boolean }) => setAvailable(d.available))
       .catch(() => setAvailable(false));
@@ -65,7 +66,7 @@ export function VoiceInput({
     setState("transcribing");
     try {
       const audioBase64 = await blobToBase64(blob);
-      const res = await fetch("/api/transcribe", {
+      const res = await apiFetch("/api/transcribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ audioBase64, mimeType: blob.type || "audio/webm" }),

@@ -4,6 +4,7 @@ import { ScanLine, Camera, QrCode, FileScan, CheckCircle2, XCircle, Loader2, Rot
 import { toast } from "sonner";
 import { PageHeader, Pill, SectionCard, StatCard } from "../components/ui-kit";
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui";
+import { apiFetch } from "../lib/api";
 
 type ScanMode = "qr" | "document";
 type ScanResult = { type: string; content: string; status: "success" | "error"; detail: string; timestamp: string };
@@ -62,7 +63,7 @@ export default function ScannerPage() {
     if (data.includes("/api/verify-qr/") || data.includes("verify-qr")) {
       const token = data.split("/").pop() ?? "";
       try {
-        const res = await fetch(`/api/verify-qr/${encodeURIComponent(token)}`);
+        const res = await apiFetch(`/api/verify-qr/${encodeURIComponent(token)}`);
         const v = await res.json();
         status = v.valid ? "success" : "error";
         detail = v.result ?? "Invalide";
@@ -72,7 +73,7 @@ export default function ScannerPage() {
       status = "success";
       // Enregistre le pointage QR
       try {
-        await fetch("/api/data/qr_scan_history", {
+        await apiFetch("/api/data/qr_scan_history", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: String(parsed.token ?? ""), type: "attendance", result: "Pointage de présence scanné" }),
@@ -129,7 +130,7 @@ export default function ScannerPage() {
     if (!capturedImage) return;
     setOcrLoading(true);
     try {
-      const res = await fetch("/api/ocr", {
+      const res = await apiFetch("/api/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: capturedImage, classId: "" }),

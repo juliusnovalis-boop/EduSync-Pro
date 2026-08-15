@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { AppRole, Establishment } from "./types";
 import type { AppEnvironment } from "./environment";
 import { currentEnvironment } from "./environment";
+import { apiFetch } from "./api";
 
 /**
  * Session applicative EduSync Pro (frontend).
@@ -114,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await apiFetch("/api/auth/me");
         if (res.ok) {
           const data = (await res.json()) as { ok: boolean; session?: SessionPayload };
           if (data.ok && data.session) {
@@ -147,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(identifier: string, password: string) {
-    const res = await fetch("/api/auth/login", {
+    const res = await apiFetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identifier, password }),
@@ -161,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(fullName: string, email: string, password: string) {
-    const res = await fetch("/api/auth/register", {
+    const res = await apiFetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ full_name: fullName, email, password }),
@@ -176,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     // Révocation serveur + suppression du cookie, puis nettoyage local.
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await apiFetch("/api/auth/logout", { method: "POST" });
     } catch {
       /* ignore */
     }
@@ -194,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-    const res = await fetch(input, { ...init, headers: { ...(init.headers ?? {}) } });
+    const res = await apiFetch(input, { ...init, headers: { ...(init.headers ?? {}) } });
     if (res.status === 401) {
       await signOut();
       toast.error("Session expirée", { description: "Votre session n'est plus valide. Veuillez vous reconnecter." });

@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "./ui";
 import { toCsv, downloadCsv } from "../lib/grades";
 import type { TableName } from "../lib/data";
+import { apiFetch } from "../lib/api";
 
 /**
  * Composant réutilisable d'import/export CSV pour n'importe quelle table.
@@ -28,7 +29,7 @@ export function ImportExport({
 
   async function handleExport() {
     try {
-      const res = await fetch(`/api/data/${table}?limit=5000`);
+      const res = await apiFetch(`/api/data/${table}?limit=5000`);
       if (!res.ok) throw new Error("Échec de l'export");
       const rows = (await res.json()) as Record<string, unknown>[];
       if (!rows.length) return toast.error("Aucune donnée à exporter");
@@ -48,7 +49,7 @@ export function ImportExport({
       const records = parseCsv(text, columns.map((c) => c.key));
       if (!records.length) return toast.error("Aucune donnée valide dans le fichier");
 
-      const res = await fetch(`/api/data/${table}`, {
+      const res = await apiFetch(`/api/data/${table}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(records),

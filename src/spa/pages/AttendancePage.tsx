@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PageHeader, Pill, SectionCard, StatCard } from "../components/ui-kit";
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui";
 import { useBulkInsert, useRows } from "../lib/data";
+import { apiFetch } from "../lib/api";
 import { ATTENDANCE_STATUS, fullName, type Attendance, type SchoolClass, type Student } from "../lib/types";
 
 const STATUSES: { value: keyof typeof ATTENDANCE_STATUS; tone: string }[] = [
@@ -69,7 +70,7 @@ export default function AttendancePage() {
       else toCreate.push({ student_id: s.id, class_id: activeClass, date, status, reason: status === "present" ? null : "Pointage" });
     }
     try {
-      await Promise.all(toUpdate.map((u) => fetch(`/api/data/attendance/${u.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(u.values) })));
+      await Promise.all(toUpdate.map((u) => apiFetch(`/api/data/attendance/${u.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(u.values) })));
       if (toCreate.length) await bulk.mutateAsync(toCreate);
       await queryClient.invalidateQueries({ queryKey: ["attendance"] });
       toast.success("Présences enregistrées");

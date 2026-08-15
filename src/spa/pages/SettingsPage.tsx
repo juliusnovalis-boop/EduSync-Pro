@@ -6,6 +6,7 @@ import { PageHeader, Pill, SectionCard } from "../components/ui-kit";
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { ROLE_LABELS, type AcademicYear } from "../lib/types";
+import { apiFetch } from "../lib/api";
 
 type AiLength = "standard" | "detaille" | "exhaustif";
 type AiProviderChoice = "auto" | "gemini" | "huggingface" | "local";
@@ -61,12 +62,12 @@ export default function SettingsPage() {
   const isAdmin = session?.isAdmin ?? false;
 
   useEffect(() => {
-    fetch("/api/ai")
+    apiFetch("/api/ai")
       .then((r) => r.json())
       .then((d: { aiEnabled: boolean; label: string }) => setAiLabel(d.aiEnabled ? d.label : null))
       .catch(() => setAiLabel(null))
       .finally(() => setAiLoading(false));
-    fetch("/api/settings")
+    apiFetch("/api/settings")
       .then((r) => r.json())
       .then((d: { provider: AiProviderChoice; model: string; length: AiLength }) => {
         setAiProvider(d.provider ?? "auto");
@@ -97,7 +98,7 @@ export default function SettingsPage() {
     setSavingAi(true);
     try {
       const model = aiModel === "__custom__" ? aiModelCustom : aiModel;
-      const res = await fetch("/api/settings", {
+      const res = await apiFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ provider: aiProvider, model, length: aiLength }),

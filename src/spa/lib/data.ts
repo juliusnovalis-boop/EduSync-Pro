@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { apiFetch } from "./api";
 
 export type TableName =
   | "students"
@@ -48,7 +49,7 @@ export function useRows<T>(table: TableName, options: Options = {}) {
         ascending: String(ascending),
         limit: String(limit),
       });
-      const res = await fetch(`/api/data/${table}?${sp.toString()}`);
+      const res = await apiFetch(`/api/data/${table}?${sp.toString()}`);
       if (!res.ok) throw new Error("Échec du chargement");
       const data = (await res.json()) as T[];
       return sortRows(data, order, ascending);
@@ -61,14 +62,14 @@ export function useSaveRow(table: TableName, label = "Enregistrement") {
   return useMutation({
     mutationFn: async ({ id, values }: { id?: string | null; values: Record<string, unknown> }) => {
       if (id) {
-        const res = await fetch(`/api/data/${table}/${id}`, {
+        const res = await apiFetch(`/api/data/${table}/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(values),
         });
         if (!res.ok) throw new Error((await safeErr(res)) ?? "Erreur");
       } else {
-        const res = await fetch(`/api/data/${table}`, {
+        const res = await apiFetch(`/api/data/${table}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(values),
@@ -88,7 +89,7 @@ export function useDeleteRow(table: TableName, label = "Élément") {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/data/${table}/${id}`, {
+      const res = await apiFetch(`/api/data/${table}/${id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -107,7 +108,7 @@ export function useBulkInsert(table: TableName) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (rows: Record<string, unknown>[]) => {
-      const res = await fetch(`/api/data/${table}`, {
+      const res = await apiFetch(`/api/data/${table}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rows),
@@ -124,7 +125,7 @@ export function useUpsertRows(table: TableName) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (rows: Record<string, unknown>[]) => {
-      const res = await fetch(`/api/data/${table}`, {
+      const res = await apiFetch(`/api/data/${table}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ upsert: true, rows }),

@@ -5,6 +5,7 @@ import { PageHeader, Pill, SectionCard } from "../components/ui-kit";
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "../components/ui";
 import { VoiceInput } from "../components/VoiceInput";
 import { TERMS, TERM_KEYS } from "../lib/types";
+import { apiFetch } from "../lib/api";
 
 function renderLine(line: string, key: number) {
   const bold = (text: string) =>
@@ -39,7 +40,7 @@ export default function IaAnalysisPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/ai")
+    apiFetch("/api/ai")
       .then((r) => r.json())
       .then((d: { aiEnabled: boolean; label: string }) => {
         setAiEnabled(d.aiEnabled);
@@ -52,7 +53,7 @@ export default function IaAnalysisPage() {
     setLoading(true);
     setReport("");
     try {
-      const res = await fetch("/api/ai", {
+      const res = await apiFetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ term, focus }),
