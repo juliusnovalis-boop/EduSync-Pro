@@ -1,0 +1,3 @@
+{
+  "/api/verify-qr/[token]/route": "app/api/verify-qr/[token]/route.js"
+}

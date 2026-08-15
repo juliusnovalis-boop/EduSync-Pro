@@ -1,0 +1,13 @@
+{
+  "/[[...all]]/page": "app/[[...all]]/page.js",
+  "/api/academic-years/route": "app/api/academic-years/route.js",
+  "/api/ai/route": "app/api/ai/route.js",
+  "/api/auth/admin-password/route": "app/api/auth/admin-password/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/auth/users/route": "app/api/auth/users/route.js",
+  "/api/data/[table]/route": "app/api/data/[table]/route.js",
+  "/api/settings/route": "app/api/settings/route.js",
+  "/api/transcribe/route": "app/api/transcribe/route.js"
+}
