@@ -211,10 +211,9 @@ export const ESTABLISHMENT_TYPES: Record<string, string> = {
   primaire: "Primaire",
   secondaire: "Secondaire",
   mixte: "Primaire & secondaire",
-  superieur: "Supérieur",
+  superieur: "Superieur",
 };
 
-/** Rôles officiels (canoniques) + alias legacy (compatibilité ascendante). */
 export type AppRole =
   | "SUPER_ADMIN"
   | "ADMIN"
@@ -233,7 +232,6 @@ export const ROLE_LABELS: Record<string, string> = {
   TEACHER: "Enseignant",
   STUDENT: "Élève",
   PARENT: "Parent",
-  // alias legacy
   super_admin: "Super administrateur",
   admin: "Administrateur",
   enseignant: "Enseignant",
@@ -241,7 +239,6 @@ export const ROLE_LABELS: Record<string, string> = {
   parent: "Parent",
 };
 
-/** Statuts de compte (DEMO vs PRODUCTION). */
 export const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Actif",
   DEMO: "Démo",
@@ -278,12 +275,28 @@ export const PERM = {
   ANNOUNCEMENTS_MANAGE: "announcements.manage",
   AI_USE: "ai.use",
   AI_CONFIGURE: "ai.configure",
+  AI_CLASS_ANALYSIS: "ai.class_analysis",
+  AI_ASSISTANT_USE: "ai.assistant_use",
+  AI_SUPPORT_PLAN: "ai.support_plan",
+  AI_DOCUMENT_GENERATE: "ai.document_generate",
   DOCUMENTS_READ: "documents.read",
   DOCUMENTS_MANAGE: "documents.manage",
+  DOCUMENTS_GENERATE: "documents.generate",
+  NOTIFICATIONS_READ: "notifications.read",
+  NOTIFICATIONS_MANAGE: "notifications.manage",
+  AUTOMATION_MANAGE: "automation.manage",
+  AUTOMATION_READ: "automation.read",
+  ANALYTICS_VIEW: "analytics.view",
+  ANALYTICS_VIEW_ALL: "analytics.view_all",
+  AMBASSADOR_MANAGE: "ambassador.manage",
+  PARTNER_MANAGE: "partner.manage",
+  PILOT_PROGRAM_MANAGE: "pilot_program.manage",
   MODULES_MANAGE: "modules.manage",
   PLUGINS_MANAGE: "plugins.manage",
   SYSTEM_CONFIGURE: "system.configure",
   SYSTEM_MANAGE: "system.manage",
+  ACADEMIC_YEAR_READ: "academic_year.read",
+  ACADEMIC_YEAR_MANAGE: "academic_year.manage",
   AUDIT_READ: "audit.read",
 } as const;
 
@@ -314,6 +327,219 @@ export type AcademicYear = {
   end_date: string | null;
   status: "ACTIVE" | "ARCHIVED" | "DRAFT";
   created_at: string | null;
+};
+
+/* ====================================================================== *
+ *  MODULE 10 — Notifications
+ * ====================================================================== */
+
+export type Notification = {
+  id: string;
+  user_id: string;
+  category: string;
+  title: string | null;
+  body: string | null;
+  priority: string | null;
+  read: boolean;
+  action_url: string | null;
+  related_id: string | null;
+  related_type: string | null;
+  created_at: string;
+};
+
+export const NOTIFICATION_CATEGORIES: Record<string, string> = {
+  SCOLARITE: "Scolarité",
+  ABSENCE: "Absence",
+  NOTE: "Note",
+  DEVOIR: "Devoir",
+  MESSAGE: "Message",
+  ADMINISTRATION: "Administration",
+  SYSTEME: "Système",
+  ALERT: "Alerte",
+};
+
+export const NOTIFICATION_PRIORITIES: Record<string, string> = {
+  low: "Faible",
+  normal: "Normal",
+  high: "Élevée",
+};
+
+/* ====================================================================== *
+ *  MODULE 4, 6, 7 — Assistants IA
+ * ====================================================================== */
+
+export type AIConversation = {
+  id: string;
+  user_id: string;
+  role: string;
+  assistant_type: string; // "teacher" | "admin" | "parent"
+  model: string | null;
+  provider: string | null;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AIConversationMessage = {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string | null;
+  created_at: string;
+};
+
+/* ====================================================================== *
+ *  MODULE 3 — Plan de soutien IA
+ * ====================================================================== */
+
+export interface SupportPlanContent {
+  objectives: string[];
+  subjects: string[];
+  groups: string[];
+  exercises: string[];
+  recommendations: string[];
+  calendar: string[];
+  tracking: string[];
+}
+
+export type AISupportPlan = {
+  id: string;
+  user_id: string;
+  class_id: string | null;
+  title: string | null;
+  content: string; // JSON
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/* ====================================================================== *
+ *  MODULE 5 — Documents générés par IA
+ * ====================================================================== */
+
+export type AIDocument = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  type: string;
+  content: string | null;
+  format: string | null;
+  related_student_id: string | null;
+  related_class_id: string | null;
+  conversation_id: string | null;
+  created_at: string;
+};
+
+export const DOCUMENT_TYPES: Record<string, string> = {
+  rapport: "Rapport",
+  fiche_pedagogique: "Fiche pédagogique",
+  bilan: "Bilan",
+  bulletin: "Bulletin",
+  synthese: "Synthèse",
+  communication_parent: "Communication parent",
+  compte_rendu: "Compte rendu",
+  rapport_classe: "Rapport de classe",
+};
+
+/* ====================================================================== *
+ *  MODULE 11 — Automatisation
+ * ====================================================================== */
+
+export type AutomationRule = {
+  id: string;
+  name: string | null;
+  description: string | null;
+  trigger: string | null;
+  condition: string | null;
+  action: string | null;
+  target_role: string | null;
+  enabled: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AutomationLog = {
+  id: string;
+  rule_id: string | null;
+  event_type: string | null;
+  result: string | null;
+  details: string | null;
+  created_at: string;
+};
+
+/* ====================================================================== *
+ *  MODULE 12 — Analytics
+ * ====================================================================== */
+
+export type AnalyticsSnapshot = {
+  id: string;
+  metric: string | null;
+  period: string | null;
+  value: number;
+  metadata: string | null;
+  created_at: string;
+};
+
+/* ====================================================================== *
+ *  MODULE 14 — Ambassadeurs
+ * ====================================================================== */
+
+export type Ambassador = {
+  id: string;
+  user_id: string | null;
+  establishment_id: string | null;
+  level: string | null;
+  status: string | null;
+  activation_date: string | null;
+  stats: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const AMBASSADOR_LEVELS: Record<string, string> = {
+  bronze: "Bronze",
+  silver: "Argent",
+  gold: "Or",
+  platinum: "Platine",
+};
+
+/* ====================================================================== *
+ *  MODULE 15 — Partenaires
+ * ====================================================================== */
+
+export type Partner = {
+  id: string;
+  establishment_id: string | null;
+  status: string | null;
+  integration_date: string | null;
+  public_info: string | null;
+  stats: string | null;
+  consent_given: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/* ====================================================================== *
+ *  MODULE 16 — Programme pilote
+ * ====================================================================== */
+
+export type PilotProgram = {
+  id: string;
+  establishment_id: string | null;
+  status: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  config: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const PILOT_STATUSES: Record<string, string> = {
+  pilot: "Programme pilote",
+  active: "Actif",
+  suspended: "Suspendu",
+  archived: "Archivé",
 };
 
 export const GRADE_TYPES: Record<string, string> = {

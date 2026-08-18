@@ -1,11 +1,11 @@
 /**
- * RBAC EduSync Pro — couche centralisée de rôles & permissions.
+ * RBAC EduSync Pro - couche centralisee de roles & permissions.
  *
- * Rôles officiels : SUPER_ADMIN > ADMIN > TEACHER > STUDENT (hiérarchie cumulative).
- * Les permissions sont cumulatives (TEACHER hérite de STUDENT, ADMIN de TEACHER…).
- * Conçu pour ajouter de nouveaux rôles (PARENT, DIRECTOR, ACCOUNTANT…) SANS réécrire.
+ * Roles officiels : SUPER_ADMIN > ADMIN > TEACHER > STUDENT > PARENT (hiérarchie cumulative).
+ * Les permissions sont cumulatives (TEACHER herite de STUDENT, ADMIN de TEACHER...).
+ * Conçu pour ajouter de nouveaux rôles (DIRECTOR, ACCOUNTANT...) SANS réécrire.
  *
- * ⚠ La sécurité ne repose JAMAIS sur l'UI : `can()` est la source de vérité,
+ * La sécurité ne repose JAMAIS sur l'UI : `can()` est la source de vérité,
  * vérifiée côté serveur par `requirePermission()` (lib/server/auth.ts).
  */
 
@@ -21,7 +21,7 @@ export const ROLES = {
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
-/** Alias legacy → rôle canonique (compatibilité ascendante, aucune donnée cassée). */
+/** Alias legacy -> rôle canonique (compatibilité ascendante, aucune donnée cassée). */
 const ROLE_ALIASES: Record<string, Role> = {
   super_admin: ROLES.SUPER_ADMIN,
   admin: ROLES.ADMIN,
@@ -29,7 +29,6 @@ const ROLE_ALIASES: Record<string, Role> = {
   eleve: ROLES.STUDENT,
   parent: ROLES.PARENT,
   directeur: ROLES.ADMIN,
-  // alias anglais (minuscules) pour la robustesse
   student: ROLES.STUDENT,
   teacher: ROLES.TEACHER,
   superadmin: ROLES.SUPER_ADMIN,
@@ -45,7 +44,7 @@ export function normalizeRole(role?: string | null): Role {
   return ROLE_ALIASES[String(role).trim()] ?? ROLES.STUDENT;
 }
 
-/** Niveau d'autorité (utilisé pour empêcher l'escalade : un acteur ne peut pas égaler/dépasser un niveau supérieur). */
+/** Niveau d'autorité (utilisé pour empêcher l'escalade). */
 export const ROLE_RANK: Record<Role, number> = {
   STUDENT: 10,
   PARENT: 15,
@@ -69,7 +68,7 @@ export const PERMISSIONS = {
   USERS_CREATE: "users.create",
   USERS_UPDATE: "users.update",
   USERS_DELETE: "users.delete",
-  USERS_MANAGE_ROLES: "users.manage_roles", // promouvoir/rétrograder
+  USERS_MANAGE_ROLES: "users.manage_roles",
   // Classes & élèves
   CLASSES_READ: "classes.read",
   CLASSES_CREATE: "classes.create",
@@ -83,7 +82,7 @@ export const PERMISSIONS = {
   ASSIGNMENTS_MANAGE: "assignments.manage",
   DOCUMENTS_READ: "documents.read",
   DOCUMENTS_MANAGE: "documents.manage",
-  // Présences
+  // Présence
   ATTENDANCE_READ: "attendance.read",
   ATTENDANCE_MANAGE: "attendance.manage",
   // Matières
@@ -102,6 +101,27 @@ export const PERMISSIONS = {
   // IA
   AI_USE: "ai.use",
   AI_CONFIGURE: "ai.configure",
+  AI_CLASS_ANALYSIS: "ai.class_analysis",
+  AI_ASSISTANT_USE: "ai.assistant_use",
+  AI_SUPPORT_PLAN: "ai.support_plan",
+  AI_DOCUMENT_GENERATE: "ai.document_generate",
+  // Documents
+  DOCUMENTS_GENERATE: "documents.generate",
+  // Notifications
+  NOTIFICATIONS_READ: "notifications.read",
+  NOTIFICATIONS_MANAGE: "notifications.manage",
+  // Automatisation
+  AUTOMATION_MANAGE: "automation.manage",
+  AUTOMATION_READ: "automation.read",
+  // Analytics
+  ANALYTICS_VIEW: "analytics.view",
+  ANALYTICS_VIEW_ALL: "analytics.view_all",
+  // Ambassadeurs
+  AMBASSADOR_MANAGE: "ambassador.manage",
+  // Partenaires
+  PARTNER_MANAGE: "partner.manage",
+  // Programme pilote
+  PILOT_PROGRAM_MANAGE: "pilot_program.manage",
   // Système / Core
   MODULES_MANAGE: "modules.manage",
   PLUGINS_MANAGE: "plugins.manage",
@@ -109,9 +129,9 @@ export const PERMISSIONS = {
   SYSTEM_MANAGE: "system.manage",
   // Année académique
   ACADEMIC_YEAR_READ: "academic_year.read",
-  ACADEMIC_YEAR_MANAGE: "academic_year.manage", // créer / modifier / activer / archiver
+  ACADEMIC_YEAR_MANAGE: "academic_year.manage",
   // Audit
-  AUDIT_READ: "audit.read",
+  AUDIT_READ: "audit.read"
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -130,6 +150,10 @@ const STUDENT_PERMS = new Set<string>([
   PERMISSIONS.DOCUMENTS_READ,
   PERMISSIONS.COMMUNICATION_USE,
   PERMISSIONS.AI_USE,
+  PERMISSIONS.AI_ASSISTANT_USE,
+  PERMISSIONS.AI_DOCUMENT_GENERATE,
+  PERMISSIONS.DOCUMENTS_GENERATE,
+  PERMISSIONS.NOTIFICATIONS_READ,
   PERMISSIONS.ACADEMIC_YEAR_READ,
 ]);
 
@@ -143,13 +167,17 @@ const TEACHER_PERMS = new Set<string>([
   PERMISSIONS.DOCUMENTS_MANAGE,
   PERMISSIONS.ANNOUNCEMENTS_MANAGE,
   PERMISSIONS.USERS_READ,
-  PERMISSIONS.USERS_CREATE, // un enseignant peut créer des comptes ÉLÈVE / PARENT
+  PERMISSIONS.USERS_CREATE,
+  PERMISSIONS.AI_CLASS_ANALYSIS,
+  PERMISSIONS.AI_SUPPORT_PLAN,
+  PERMISSIONS.ANALYTICS_VIEW,
+  PERMISSIONS.NOTIFICATIONS_MANAGE,
+  PERMISSIONS.AUTOMATION_READ,
 ]);
 
 /** Admin d'établissement = enseignant + gestion de son établissement. */
 const ADMIN_PERMS = new Set<string>([
   ...TEACHER_PERMS,
-  PERMISSIONS.USERS_CREATE,
   PERMISSIONS.USERS_UPDATE,
   PERMISSIONS.USERS_DELETE,
   PERMISSIONS.CLASSES_CREATE,
@@ -162,6 +190,10 @@ const ADMIN_PERMS = new Set<string>([
   PERMISSIONS.SCHOOLS_MANAGE_OWN,
   PERMISSIONS.AUDIT_READ,
   PERMISSIONS.ACADEMIC_YEAR_MANAGE,
+  PERMISSIONS.AI_ASSISTANT_USE,
+  PERMISSIONS.ANALYTICS_VIEW_ALL,
+  PERMISSIONS.NOTIFICATIONS_MANAGE,
+  PERMISSIONS.AUTOMATION_MANAGE,
 ]);
 
 /** Parent = consultation limitée (suivi de l'enfant). */
@@ -172,6 +204,12 @@ const PARENT_PERMS = new Set<string>([
   PERMISSIONS.ATTENDANCE_READ,
   PERMISSIONS.DOCUMENTS_READ,
   PERMISSIONS.COMMUNICATION_USE,
+  PERMISSIONS.AI_USE,
+  PERMISSIONS.AI_ASSISTANT_USE,
+  PERMISSIONS.AI_DOCUMENT_GENERATE,
+  PERMISSIONS.DOCUMENTS_GENERATE,
+  PERMISSIONS.NOTIFICATIONS_READ,
+  PERMISSIONS.ACADEMIC_YEAR_READ,
 ]);
 
 /** Super Admin = tout (rôle système propriétaire de la plateforme). */
@@ -180,11 +218,10 @@ const SUPER_ADMIN_PERMS = new Set<string>(ALL_PERMISSIONS);
 /**
  * Matrice de création de comptes — source unique des rôles qu'un acteur peut créer.
  * Hiérarchie stricte (anti-escalade) :
- *   • SUPER_ADMIN → ADMIN, TEACHER, STUDENT, PARENT
- *   • ADMIN       → TEACHER uniquement
- *   • TEACHER     → STUDENT, PARENT
- *   • STUDENT     → aucun
- * Vérifiée côté serveur dans POST /api/auth/users. Jamais confiée à l'UI seule.
+ *   SUPER_ADMIN -> ADMIN, TEACHER, STUDENT, PARENT
+ *   ADMIN       -> TEACHER uniquement
+ *   TEACHER     -> STUDENT, PARENT
+ *   STUDENT     -> aucun
  */
 export const CREATABLE_ROLES: Record<Role, Role[]> = {
   SUPER_ADMIN: [ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT],

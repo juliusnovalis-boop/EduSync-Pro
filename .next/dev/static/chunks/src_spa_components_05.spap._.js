@@ -93,6 +93,8 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$re
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$printer$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Printer$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/printer.mjs [app-client] (ecmascript) <export default as Printer>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$folder$2d$open$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FolderOpen$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/folder-open.mjs [app-client] (ecmascript) <export default as FolderOpen>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2d$check$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShieldCheck$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/shield-check.mjs [app-client] (ecmascript) <export default as ShieldCheck>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bell$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Bell$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/bell.mjs [app-client] (ecmascript) <export default as Bell>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bot$2d$message$2d$square$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__BotMessageSquare$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/bot-message-square.mjs [app-client] (ecmascript) <export default as BotMessageSquare>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$spa$2f$lib$2f$types$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/spa/lib/types.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$spa$2f$lib$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/spa/lib/utils.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$spa$2f$lib$2f$auth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/spa/lib/auth.tsx [app-client] (ecmascript)");
@@ -187,6 +189,18 @@ const NAV_ITEMS = [
         url: "/ia-analysis",
         icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$sparkles$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Sparkles$3e$__["Sparkles"],
         permission: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$spa$2f$lib$2f$types$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["PERM"].AI_USE
+    },
+    {
+        title: "Assistant EduSync",
+        url: "/ai-assistant",
+        icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bot$2d$message$2d$square$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__BotMessageSquare$3e$__["BotMessageSquare"],
+        permission: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$spa$2f$lib$2f$types$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["PERM"].AI_ASSISTANT_USE
+    },
+    {
+        title: "Notifications",
+        url: "/notifications",
+        icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$bell$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Bell$3e$__["Bell"],
+        permission: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$spa$2f$lib$2f$types$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["PERM"].NOTIFICATIONS_READ
     },
     {
         title: "QR Center",
@@ -287,12 +301,12 @@ function AppSidebar({ onNavigate }) {
                                 className: "size-5"
                             }, void 0, false, {
                                 fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                                lineNumber: 75,
+                                lineNumber: 79,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                            lineNumber: 74,
+                            lineNumber: 78,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -303,7 +317,7 @@ function AppSidebar({ onNavigate }) {
                                     children: "EduSync Pro"
                                 }, void 0, false, {
                                     fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                                    lineNumber: 78,
+                                    lineNumber: 82,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -311,24 +325,24 @@ function AppSidebar({ onNavigate }) {
                                     children: "SCHOOL MANAGER"
                                 }, void 0, false, {
                                     fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                                    lineNumber: 79,
+                                    lineNumber: 83,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                            lineNumber: 77,
+                            lineNumber: 81,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                    lineNumber: 73,
+                    lineNumber: 77,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                lineNumber: 72,
+                lineNumber: 76,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("nav", {
@@ -342,25 +356,25 @@ function AppSidebar({ onNavigate }) {
                                 className: "size-4"
                             }, void 0, false, {
                                 fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                                lineNumber: 99,
+                                lineNumber: 103,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: item.title
                             }, void 0, false, {
                                 fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                                lineNumber: 100,
+                                lineNumber: 104,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, item.url, true, {
                         fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                        lineNumber: 86,
+                        lineNumber: 90,
                         columnNumber: 11
                     }, this))
             }, void 0, false, {
                 fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                lineNumber: 84,
+                lineNumber: 88,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -373,7 +387,7 @@ function AppSidebar({ onNavigate }) {
                             children: "Année scolaire"
                         }, void 0, false, {
                             fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                            lineNumber: 107,
+                            lineNumber: 111,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -381,24 +395,24 @@ function AppSidebar({ onNavigate }) {
                             children: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$spa$2f$lib$2f$types$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SCHOOL_YEAR"].replace("-", " — ")
                         }, void 0, false, {
                             fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                            lineNumber: 108,
+                            lineNumber: 112,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                    lineNumber: 106,
+                    lineNumber: 110,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/spa/components/AppSidebar.tsx",
-                lineNumber: 105,
+                lineNumber: 109,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/spa/components/AppSidebar.tsx",
-        lineNumber: 71,
+        lineNumber: 75,
         columnNumber: 5
     }, this);
 }

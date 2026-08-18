@@ -23,7 +23,20 @@ export type TableName =
   | "digital_documents"
   | "attendance_sessions"
   | "attendance_qr_records"
-  | "qr_scan_history";
+  | "qr_scan_history"
+  | "parent_student_links"
+  | "notifications"
+  | "ai_conversations"
+  | "ai_conversation_messages"
+  | "ai_support_plans"
+  | "ai_documents"
+  | "automation_rules"
+  | "automation_logs"
+  | "analytics_snapshots"
+  | "ambassadors"
+  | "partners"
+  | "pilot_programs"
+  | "ai_access_logs";
 
 type Options = { order?: string; ascending?: boolean; limit?: number };
 

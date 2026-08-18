@@ -25,6 +25,8 @@ import {
   Printer,
   FolderOpen,
   ShieldCheck,
+  Bell,
+  BotMessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { SCHOOL_YEAR, PERM } from "../lib/types";
@@ -48,6 +50,8 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Emploi du temps", url: "/timetable", icon: CalendarDays, permission: PERM.DASHBOARD_VIEW },
   { title: "Rapports", url: "/reports", icon: BarChart3, permission: PERM.CLASSES_READ },
   { title: "Analyse IA", url: "/ia-analysis", icon: Sparkles, permission: PERM.AI_USE },
+  { title: "Assistant EduSync", url: "/ai-assistant", icon: BotMessageSquare, permission: PERM.AI_ASSISTANT_USE },
+  { title: "Notifications", url: "/notifications", icon: Bell, permission: PERM.NOTIFICATIONS_READ },
   { title: "QR Center", url: "/qr-center", icon: QrCode, permission: PERM.USERS_READ },
   { title: "Scanner", url: "/scanner", icon: Camera, permission: PERM.CLASSES_READ },
   { title: "Présence QR", url: "/qr-attendance", icon: ScanLine, permission: PERM.ATTENDANCE_MANAGE },

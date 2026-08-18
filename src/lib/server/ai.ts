@@ -122,9 +122,9 @@ export async function geminiTranscribe(buffer: Buffer, mimeType: string) {
     ],
     generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
   };
-  const res = await fetch(`${GEMINI_NATIVE_URL}/${model}:generateContent?key=${key}`, {
+  const res = await fetch(`${GEMINI_NATIVE_URL}/${model}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify(body),
   });
   if (res.status === 429) throw new Error("Limite de requêtes Gemini atteinte — réessayez.");
@@ -392,7 +392,7 @@ type AnalysisParams = {
   focus?: string;
 };
 
-function buildDataContext(params: AnalysisParams) {
+export function buildDataContext(params: AnalysisParams) {
   const { termLabel, students, subjects, grades, attendance, payments } = params;
   const termGrades = params.term === "all" ? grades : grades.filter((g) => g.term === params.term);
   const general = average(termGrades);
@@ -484,7 +484,7 @@ function buildDataContext(params: AnalysisParams) {
   ].join("\n");
 }
 
-function buildSystemPrompt() {
+export function buildSystemPrompt() {
   return [
     `Tu es un conseiller pédagogique expert et un chef d'établissement expérimenté, travaillant pour EduSync Pro, une plateforme de gestion scolaire au Gabon (système éducatif francophone, notes sur 20).`,
     `Analyse en PROFONDEUR les données fournies et rédige un RAPPORT COMPLET, DÉTAILLÉ et SUBSTANTIEL en Markdown français.`,
@@ -518,7 +518,7 @@ function buildSystemPrompt() {
 
 /* ----------------------- Analyse locale (fallback) --------------------- */
 
-function localSchoolAnalysis(params: AnalysisParams & { attendanceRate?: number; totalRevenue?: number }) {
+export function localSchoolAnalysis(params: AnalysisParams & { attendanceRate?: number; totalRevenue?: number }) {
   const { termLabel, students, subjects, focus } = params;
   const grades = params.grades;
   const termGrades = params.term === "all" ? grades : grades.filter((g) => g.term === params.term);

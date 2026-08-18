@@ -22,6 +22,19 @@ import {
   attendanceSessions,
   attendanceQrRecords,
   qrScanHistory,
+  parentStudentLinks,
+  notifications,
+  aiConversations,
+  aiConversationMessages,
+  aiSupportPlans,
+  aiDocuments,
+  automationRules,
+  automationLogs,
+  analyticsSnapshots,
+  ambassadors,
+  partners,
+  pilotPrograms,
+  aiAccessLogs,
 } from "@/db/schema";
 
 /**
@@ -53,6 +66,19 @@ export const TABLES: Record<string, string[]> = {
   attendance_sessions: ["id", "class_id", "teacher_name", "date", "qr_token", "status", "created_at"],
   attendance_qr_records: ["id", "session_id", "student_id", "scanned_at", "status", "created_at"],
   qr_scan_history: ["id", "token", "type", "result", "created_at"],
+  parent_student_links: ["id", "parent_user_id", "student_id", "created_at"],
+  notifications: ["id", "user_id", "category", "title", "body", "priority", "read", "action_url", "related_id", "related_type", "created_at"],
+  ai_conversations: ["id", "user_id", "role", "assistant_type", "model", "provider", "title", "created_at", "updated_at"],
+  ai_conversation_messages: ["id", "conversation_id", "role", "content", "created_at"],
+  ai_support_plans: ["id", "user_id", "class_id", "title", "content", "status", "created_at", "updated_at"],
+  ai_documents: ["id", "user_id", "title", "type", "content", "format", "related_student_id", "related_class_id", "conversation_id", "created_at"],
+  automation_rules: ["id", "name", "description", "trigger", "condition", "action", "target_role", "enabled", "created_by", "created_at", "updated_at"],
+  automation_logs: ["id", "rule_id", "event_type", "result", "details", "created_at"],
+  analytics_snapshots: ["id", "metric", "period", "value", "metadata", "created_at"],
+  ambassadors: ["id", "user_id", "establishment_id", "level", "status", "activation_date", "stats", "created_at", "updated_at"],
+  partners: ["id", "establishment_id", "status", "integration_date", "public_info", "stats", "consent_given", "created_at", "updated_at"],
+  pilot_programs: ["id", "establishment_id", "status", "start_date", "end_date", "config", "created_at", "updated_at"],
+  ai_access_logs: ["id", "user_id", "role", "resource", "action", "permission", "granted", "created_at"],
 };
 
 const NUMERIC: Record<string, string[]> = {
@@ -62,6 +88,7 @@ const NUMERIC: Record<string, string[]> = {
   payments: ["amount"],
   course_sessions: ["day_of_week"],
   assignments: ["max_score"],
+  analytics_snapshots: ["value"],
 };
 
 const ARRAY: Record<string, string[]> = {
@@ -90,6 +117,19 @@ const REGISTRY = {
   attendance_sessions: attendanceSessions,
   attendance_qr_records: attendanceQrRecords,
   qr_scan_history: qrScanHistory,
+  parent_student_links: parentStudentLinks,
+  notifications,
+  ai_conversations: aiConversations,
+  ai_conversation_messages: aiConversationMessages,
+  ai_support_plans: aiSupportPlans,
+  ai_documents: aiDocuments,
+  automation_rules: automationRules,
+  automation_logs: automationLogs,
+  analytics_snapshots: analyticsSnapshots,
+  ambassadors,
+  partners,
+  pilot_programs: pilotPrograms,
+  ai_access_logs: aiAccessLogs,
 };
 
 export function isTableName(value: string): value is TableName {

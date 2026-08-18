@@ -4,7 +4,7 @@ self.__SERVER_FILES_MANIFEST={
     "env": {},
     "webpack": null,
     "typescript": {
-      "ignoreBuildErrors": true
+      "ignoreBuildErrors": false
     },
     "typedRoutes": false,
     "distDir": ".next",
@@ -42,7 +42,7 @@ self.__SERVER_FILES_MANIFEST={
         256,
         384
       ],
-      "path": "/_next/image/",
+      "path": "/_next/image",
       "loader": "default",
       "loaderFile": "",
       "domains": [],
@@ -67,7 +67,7 @@ self.__SERVER_FILES_MANIFEST={
       "qualities": [
         75
       ],
-      "unoptimized": true,
+      "unoptimized": false,
       "customCacheHandler": false
     },
     "devIndicators": {
@@ -79,7 +79,7 @@ self.__SERVER_FILES_MANIFEST={
     },
     "basePath": "",
     "sassOptions": {},
-    "trailingSlash": true,
+    "trailingSlash": false,
     "i18n": null,
     "productionBrowserSourceMaps": false,
     "excludeDefaultMomentLocales": true,
@@ -96,7 +96,6 @@ self.__SERVER_FILES_MANIFEST={
     "compiler": {},
     "expireTime": 31536000,
     "staticPageGenerationTimeout": 60,
-    "output": "export",
     "modularizeImports": {
       "@mui/icons-material": {
         "transform": "@mui/icons-material/{{member}}"
@@ -105,7 +104,7 @@ self.__SERVER_FILES_MANIFEST={
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
+    "outputFileTracingRoot": "c:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -305,11 +304,11 @@ self.__SERVER_FILES_MANIFEST={
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro"
+      "root": "c:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro"
     },
-    "distDirRoot": ".next-mobile"
+    "distDirRoot": ".next"
   },
-  "appDir": "C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
+  "appDir": "c:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
   "relativeAppDir": "",
   "files": [
     ".next\\routes-manifest.json",

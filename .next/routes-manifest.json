@@ -6,26 +6,12 @@
   "basePath": "",
   "redirects": [
     {
-      "source": "/:file((?!\\.well-known(?:/.*)?)(?:[^/]+/)*[^/]+\\.\\w+)/",
-      "destination": "/:file",
-      "internal": true,
-      "priority": true,
-      "missing": [
-        {
-          "type": "header",
-          "key": "x-nextjs-data"
-        }
-      ],
-      "statusCode": 308,
-      "regex": "^(?:/((?!\\.well-known(?:/.*)?)(?:[^/]+/)*[^/]+\\.\\w+))/$"
-    },
-    {
-      "source": "/:notfile((?!\\.well-known(?:/.*)?)(?:[^/]+/)*[^/\\.]+)",
-      "destination": "/:notfile/",
+      "source": "/:path+/",
+      "destination": "/:path+",
       "internal": true,
       "priority": true,
       "statusCode": 308,
-      "regex": "^(?:/((?!\\.well-known(?:/.*)?)(?:[^/]+/)*[^/\\.]+))$"
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
     }
   ],
   "headers": [],
@@ -36,6 +22,39 @@
     "fallback": []
   },
   "dynamicRoutes": [
+    {
+      "page": "/api/data/[table]",
+      "regex": "^/api/data/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtable": "nxtPtable"
+      },
+      "namedRegex": "^/api/data/(?<nxtPtable>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/data/[table]/[id]",
+      "regex": "^/api/data/([^/]+?)/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtable": "nxtPtable",
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/data/(?<nxtPtable>[^/]+?)/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/notifications/[id]",
+      "regex": "^/api/notifications/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/notifications/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/verify-qr/[token]",
+      "regex": "^/api/verify\\-qr/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtoken": "nxtPtoken"
+      },
+      "namedRegex": "^/api/verify\\-qr/(?<nxtPtoken>[^/]+?)(?:/)?$"
+    },
     {
       "page": "/[[...all]]",
       "regex": "^(?:/(.+?))?(?:/)?$",
@@ -57,6 +76,114 @@
       "regex": "^/_not\\-found(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/academic-years",
+      "regex": "^/api/academic\\-years(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/academic\\-years(?:/)?$"
+    },
+    {
+      "page": "/api/ai",
+      "regex": "^/api/ai(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai(?:/)?$"
+    },
+    {
+      "page": "/api/ai/chat",
+      "regex": "^/api/ai/chat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai/chat(?:/)?$"
+    },
+    {
+      "page": "/api/ai/gateway",
+      "regex": "^/api/ai/gateway(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai/gateway(?:/)?$"
+    },
+    {
+      "page": "/api/audit",
+      "regex": "^/api/audit(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/audit(?:/)?$"
+    },
+    {
+      "page": "/api/auth/admin-password",
+      "regex": "^/api/auth/admin\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/admin\\-password(?:/)?$"
+    },
+    {
+      "page": "/api/auth/login",
+      "regex": "^/api/auth/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/login(?:/)?$"
+    },
+    {
+      "page": "/api/auth/logout",
+      "regex": "^/api/auth/logout(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/logout(?:/)?$"
+    },
+    {
+      "page": "/api/auth/me",
+      "regex": "^/api/auth/me(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/me(?:/)?$"
+    },
+    {
+      "page": "/api/auth/register",
+      "regex": "^/api/auth/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/register(?:/)?$"
+    },
+    {
+      "page": "/api/auth/users",
+      "regex": "^/api/auth/users(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/users(?:/)?$"
+    },
+    {
+      "page": "/api/core/status",
+      "regex": "^/api/core/status(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/core/status(?:/)?$"
+    },
+    {
+      "page": "/api/health",
+      "regex": "^/api/health(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/health(?:/)?$"
+    },
+    {
+      "page": "/api/notifications",
+      "regex": "^/api/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notifications(?:/)?$"
+    },
+    {
+      "page": "/api/ocr",
+      "regex": "^/api/ocr(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ocr(?:/)?$"
+    },
+    {
+      "page": "/api/seed",
+      "regex": "^/api/seed(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/seed(?:/)?$"
+    },
+    {
+      "page": "/api/settings",
+      "regex": "^/api/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/settings(?:/)?$"
+    },
+    {
+      "page": "/api/transcribe",
+      "regex": "^/api/transcribe(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/transcribe(?:/)?$"
     }
   ],
   "dataRoutes": [],

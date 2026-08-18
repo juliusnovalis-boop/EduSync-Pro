@@ -1,32 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listRows } from "@/lib/server/data";
-import {
-  detectAiProvider,
-  hfToken,
-  isHfToken,
-  geminiOcrGrades,
-  hfOcrGrades,
-} from "@/lib/server/ai";
-import { bindRequestEnvironment } from "@/lib/server/environment";
+import { detectAiProvider, aiProviderLabel } from "@/lib/server/ai";
+import { aiGuard } from "@/lib/server/ai-guard";
+import { PERMISSIONS } from "@/lib/server/rbac";
+import { aiGateway, AiGatewayError } from "@/lib/server/ai-gateway";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const guard = await aiGuard(req, PERMISSIONS.AI_USE, "ocr", "get_status");
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
   const provider = detectAiProvider();
-  return NextResponse.json({ available: provider !== "local", provider });
+  return NextResponse.json({ available: provider !== "local", provider, label: aiProviderLabel() });
 }
 
 export async function POST(req: NextRequest) {
-  bindRequestEnvironment(req);
+  const guard = await aiGuard(req, PERMISSIONS.AI_USE, "ocr", "extract_grades");
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
   try {
-    const provider = detectAiProvider();
-    if (provider === "local") {
-      return NextResponse.json(
-        { error: "OCR indisponible : configurez GEMINI_API_KEY ou HF_TOKEN pour activer la reconnaissance par IA." },
-        { status: 501 },
-      );
-    }
-
     const body = (await req.json()) as { classId?: string; image?: string };
     if (!body.image || !String(body.image).startsWith("data:image/")) {
       return NextResponse.json({ error: "Image manquante ou invalide." }, { status: 400 });
@@ -48,20 +39,27 @@ export async function POST(req: NextRequest) {
     }));
     const ocrParams = { imageDataUrl: body.image, students: roster };
 
-    let grades: Array<{ studentId: string; value: number }> = [];
-    if (provider === "gemini") {
-      try {
-        grades = await geminiOcrGrades(ocrParams);
-      } catch (error) {
-        console.error("[ocr] gemini échec, fallback HF :", (error as Error).message);
-        if (isHfToken(hfToken())) grades = await hfOcrGrades(ocrParams);
-        else throw error;
+    try {
+      const response = await aiGateway({
+        userId: guard.ctx.userId,
+        role: guard.ctx.role,
+        schoolId: guard.ctx.schoolId,
+        environment: guard.environment,
+        taskType: "vision",
+        capability: "ocr",
+        ocrInput: ocrParams,
+      });
+      const grades = JSON.parse(response.content) as Array<{ studentId: string; value: number }>;
+      return NextResponse.json({ grades, count: grades.length, total: roster.length });
+    } catch (gwErr) {
+      if (gwErr instanceof AiGatewayError && gwErr.code === "FREE_SERVICE_UNAVAILABLE") {
+        return NextResponse.json(
+          { error: "Le service IA gratuit correspondant à cette tâche est actuellement indisponible." },
+          { status: 503 },
+        );
       }
-    } else {
-      grades = await hfOcrGrades(ocrParams);
+      throw gwErr;
     }
-
-    return NextResponse.json({ grades, count: grades.length, total: roster.length });
   } catch (error) {
     console.error("[ocr] erreur :", error);
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });

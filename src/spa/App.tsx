@@ -18,6 +18,8 @@ import BulletinsPage from "./pages/BulletinsPage";
 import TimetablePage from "./pages/TimetablePage";
 import ReportsPage from "./pages/ReportsPage";
 import IaAnalysisPage from "./pages/IaAnalysisPage";
+import AiAssistantPage from "./pages/AiAssistantPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import QrCenterPage from "./pages/QrCenterPage";
 import ScannerPage from "./pages/ScannerPage";
 import QrAttendancePage from "./pages/QrAttendancePage";
@@ -54,6 +56,8 @@ export default function App() {
               <Route path="/timetable" element={<TimetablePage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/ia-analysis" element={<IaAnalysisPage />} />
+              <Route path="/ai-assistant" element={<AiAssistantPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/qr-center" element={<QrCenterPage />} />
               <Route path="/scanner" element={<ScannerPage />} />
               <Route path="/qr-attendance" element={<QrAttendancePage />} />

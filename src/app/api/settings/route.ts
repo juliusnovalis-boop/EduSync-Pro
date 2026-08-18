@@ -4,6 +4,7 @@ import { PERMISSIONS } from "@/lib/server/rbac";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/server/audit";
 import { getAiSettings, setAiSettings } from "@/lib/server/ai";
 import { bindRequestEnvironment } from "@/lib/server/environment";
+import { checkModelIsFree, type AiProviderId } from "@/lib/server/ai-gateway";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,12 @@ export async function PUT(req: NextRequest) {
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
     const body = (await req.json()) as { provider?: string; model?: string; length?: string };
+    if (body.model) {
+      const provider = body.provider === "openrouter" ? "openrouter" : "gemini";
+      if (!checkModelIsFree(provider as AiProviderId, body.model).allowed) {
+        return NextResponse.json({ error: "Modèle payant ou de prix inconnu : configuration refusée." }, { status: 400 });
+      }
+    }
     await setAiSettings({ provider: body.provider, model: body.model, length: body.length });
     await logAudit({
       actor_id: auth.actor.userId,
