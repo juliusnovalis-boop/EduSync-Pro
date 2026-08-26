@@ -78,6 +78,10 @@
     --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
       "Courier New", monospace;
+    --color-amber-400: #fcbb00;
+    --color-amber-600: #dd7400;
+    --color-emerald-400: #00d294;
+    --color-emerald-600: #009767;
     --color-slate-400: #90a1b9;
     --color-slate-950: #020618;
     --color-black: #000;
@@ -105,6 +109,7 @@
     --text-3xl--line-height: calc(2.25 / 1.875);
     --text-4xl: 2.25rem;
     --text-4xl--line-height: calc(2.5 / 2.25);
+    --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
@@ -137,6 +142,10 @@
 
   @supports (color: lab(0% 0 0)) {
     :root, :host {
+      --color-amber-400: lab(80.1641% 16.6016 99.2089);
+      --color-amber-600: lab(60.3514% 40.5624 87.1228);
+      --color-emerald-400: lab(75.0771% -60.7313 19.4146);
+      --color-emerald-600: lab(55.0481% -49.9246 15.93);
       --color-slate-400: lab(65.5349% -2.25151 -14.5072);
       --color-slate-950: lab(1.76974% 1.32743 -9.28855);
       --shadow-card: 0 1px 2px lab(6.63622% 7.3253 -17.1312 / .04), 0 8px 24px lab(6.63622% 7.3253 -17.1312 / .05);
@@ -645,6 +654,10 @@
     margin-right: calc(var(--spacing) * 2);
   }
 
+  .mb-1 {
+    margin-bottom: calc(var(--spacing) * 1);
+  }
+
   .mb-2 {
     margin-bottom: calc(var(--spacing) * 2);
   }
@@ -667,6 +680,10 @@
 
   .mb-8 {
     margin-bottom: calc(var(--spacing) * 8);
+  }
+
+  .ml-2 {
+    margin-left: calc(var(--spacing) * 2);
   }
 
   .ml-5 {
@@ -838,6 +855,10 @@
     height: calc(var(--spacing) * 48);
   }
 
+  .h-1\.5 {
+    height: calc(var(--spacing) * 1.5);
+  }
+
   .h-2 {
     height: calc(var(--spacing) * 2);
   }
@@ -912,6 +933,10 @@
 
   .min-h-screen {
     min-height: 100vh;
+  }
+
+  .w-4 {
+    width: calc(var(--spacing) * 4);
   }
 
   .w-8 {
@@ -2018,6 +2043,11 @@
     font-weight: var(--font-weight-medium);
   }
 
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+  }
+
   .font-semibold {
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
@@ -2071,12 +2101,20 @@
     color: var(--accent-foreground);
   }
 
+  .text-amber-600 {
+    color: var(--color-amber-600);
+  }
+
   .text-destructive {
     color: var(--destructive);
   }
 
   .text-destructive-foreground {
     color: var(--destructive-foreground);
+  }
+
+  .text-emerald-600 {
+    color: var(--color-emerald-600);
   }
 
   .text-foreground {
@@ -2754,6 +2792,14 @@
     .xl\:grid-cols-4 {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
+  }
+
+  .dark\:text-amber-400:is(.dark *) {
+    color: var(--color-amber-400);
+  }
+
+  .dark\:text-emerald-400:is(.dark *) {
+    color: var(--color-emerald-400);
   }
 
   @media print {

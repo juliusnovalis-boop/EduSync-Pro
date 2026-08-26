@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Send, Sparkles, Bot, Trash2, Loader2 } from "lucide-react";
 import { Button, Textarea } from "../components/ui";
 import { useAuth } from "../lib/auth";
@@ -11,6 +12,7 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  sources?: string[];
 };
 
 /**
@@ -73,8 +75,8 @@ export default function AiAssistantPage() {
     }
   }
 
-  async function handleSend() {
-    const content = input.trim();
+  async function handleSend(directContent?: string) {
+    const content = (directContent ?? input).trim();
     if (!content || loading) return;
     setInput("");
     setLoading(true);
@@ -86,14 +88,14 @@ export default function AiAssistantPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: content, conversationId: currentConvId ?? undefined }),
       });
-      const data = (await res.json()) as { message?: string; conversationId?: string; error?: string; source?: string; label?: string };
+      const data = (await res.json()) as { message?: string; conversationId?: string; error?: string; source?: string; label?: string; sources?: string[] };
       if (!res.ok || !data.message) {
         setError(data.error ?? "Erreur lors de la génération de la réponse.");
         setMessages((prev) => prev.slice(0, -1));
         return;
       }
       setCurrentConvId(data.conversationId ?? currentConvId);
-      setMessages((prev) => [...prev, { id: `ai-${Date.now()}`, role: "assistant", content: data.message ?? "", createdAt: new Date().toISOString() }]);
+      setMessages((prev) => [...prev, { id: `ai-${Date.now()}`, role: "assistant", content: data.message ?? "", createdAt: new Date().toISOString(), sources: data.sources }]);
       await loadConversations();
     } catch {
       setError("Erreur de connexion au serveur.");
@@ -169,10 +171,7 @@ export default function AiAssistantPage() {
                   {suggestionsForRole(role).map((s) => (
                     <button
                       key={s}
-                      onClick={() => {
-                        setInput(s);
-                        handleSend();
-                      }}
+                      onClick={() => void handleSend(s)}
                       className="rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
                     >
                       {s}
@@ -185,13 +184,18 @@ export default function AiAssistantPage() {
                 <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
                       m.role === "user"
-                        ? "rounded-br-sm bg-primary text-primary-foreground"
+                        ? "whitespace-pre-wrap rounded-br-sm bg-primary text-primary-foreground"
                         : "rounded-bl-sm bg-muted",
                     )}
                   >
-                    {m.content}
+                    {m.role === "assistant" ? <MarkdownLite content={m.content} /> : m.content}
+                    {m.role === "assistant" && m.sources && m.sources.length > 0 && (
+                      <p className="mt-2 border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground">
+                        Données utilisées (serveur, périmètre autorisé) : {m.sources.join(" · ")}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))
@@ -200,7 +204,7 @@ export default function AiAssistantPage() {
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
-                  L'assistant réfléchit…
+                  Analyse des données scolaires…
                 </div>
               </div>
             )}
@@ -235,27 +239,29 @@ export default function AiAssistantPage() {
 
 function roleLabel(role: string): string {
   const r = role.toUpperCase();
-  if (r === "ADMIN" || r === "SUPER_ADMIN") return "Assistant administratif";
-  if (r === "PARENT") return "Assistant parent";
+  if (r === "ADMIN" || r === "SUPER_ADMIN") return "Copilote direction";
+  if (r === "PARENT") return "Copilote parent";
   if (r === "STUDENT") return "Assistant élève";
-  return "Assistant enseignant";
+  return "Copilote enseignant";
 }
 
+/** Suggestions contextuelles — adaptées au rôle et aux capacités réelles du copilote. */
 function suggestionsForRole(role: string): string[] {
   const r = role.toUpperCase();
   if (r === "ADMIN" || r === "SUPER_ADMIN") {
     return [
-      "Analyse les résultats de cet établissement.",
-      "Quels niveaux ont les plus grandes difficultés ?",
-      "Prépare le rapport mensuel.",
-      "Compare les performances des classes.",
+      "Analyse les performances de mon établissement.",
+      "Quels élèves ont besoin d'un accompagnement ?",
+      "Compare cette période à la précédente.",
+      "Pourquoi les absences augmentent-elles ?",
+      "Prépare un rapport pour la direction.",
     ];
   }
   if (r === "PARENT") {
     return [
       "Comment évoluent les résultats de mon enfant ?",
       "Quelles matières nécessitent plus d'attention ?",
-      "Quels devoirs sont actuellement disponibles ?",
+      "Quels devoirs sont à venir ?",
     ];
   }
   if (r === "STUDENT") {
@@ -267,4 +273,39 @@ function suggestionsForRole(role: string): string[] {
     "Crée des exercices.",
     "Génère une évaluation.",
   ];
+}
+
+/** Rendu markdown minimal (titres ###, gras **, listes -) sans dépendance externe. */
+function MarkdownLite({ content }: { content: string }) {
+  const blocks = content.split(/\n{2,}/);
+  const inline = (text: string): ReactNode[] =>
+    text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+      part.startsWith("**") && part.endsWith("**")
+        ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
+        : <span key={i}>{part}</span>,
+    );
+  return (
+    <div className="space-y-2">
+      {blocks.map((block, bi) => {
+        const lines = block.split("\n");
+        if (lines.every((l) => /^[-•]\s/.test(l))) {
+          return (
+            <ul key={bi} className="ml-4 list-disc space-y-1">
+              {lines.map((l, i) => <li key={i}>{inline(l.replace(/^[-•]\s/, ""))}</li>)}
+            </ul>
+          );
+        }
+                const headingIdx = block.indexOf("###");
+        const headingEnd = headingIdx >= 0 ? block.indexOf("\n") : -1;
+        const heading = headingIdx === 0 && (headingEnd === -1 || block.slice(0, 4) === "### ");
+        if (heading) {
+          const text = headingEnd === -1 ? block.slice(4) : block.slice(4, headingEnd);
+          return (
+            <p key={bi} className="pt-1 font-semibold first:pt-0">{inline(text)}</p>
+          );
+        }
+        return <p key={bi}>{inline(block)}</p>;
+      })}
+    </div>
+  );
 }

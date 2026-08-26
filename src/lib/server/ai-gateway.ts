@@ -1,14 +1,17 @@
 ﻿/** Secure, server-only multi-provider AI gateway. */
 import { geminiChat, geminiOcrGrades, geminiTranscribe, readSecret, GEMINI_VISION_MODEL, GEMINI_TEXT_MODEL } from "./ai";
-import { aiRouter } from "./ai-router";
+import { aiRouter, AIRouterError } from "./ai-router";
 import {
   AiProviderId, AiTaskType, AiCapability, AiProviderInfo, PROVIDER_PRIORITY,
   checkModelIsFree, resolveFreeModels, listProviders, invalidateModelMetadata,
   type ModelMetadata,
 } from "./ai-policy";
+import { ollamaChat, OllamaProviderError } from "./providers/ollama-provider";
+import { checkAndReserve, recordUsage, getLimits, ROLE_QUOTAS, type QuotaContext } from "./ai-quota-manager";
 
 // Réexport pour compatibilité — les symboles partagés proviennent de ai-policy.ts
-export { AiProviderId, AiTaskType, AiCapability, AiProviderInfo, PROVIDER_PRIORITY, ModelMetadata, checkModelIsFree, resolveFreeModels, listProviders, invalidateModelMetadata };
+export type { AiProviderId, AiTaskType, AiCapability, AiProviderInfo, ModelMetadata };
+export { PROVIDER_PRIORITY, checkModelIsFree, resolveFreeModels, listProviders, invalidateModelMetadata };
 
 export type OcrStudentRef = { id: string; name: string };
 export type OcrResult = Array<{ studentId: string; value: number }>;
@@ -27,26 +30,39 @@ export class AiGatewayError extends Error {
   constructor(public readonly code: "FREE_SERVICE_UNAVAILABLE" | "QUOTA_EXCEEDED" | "RATE_LIMITED" | "PAID_OR_UNKNOWN_MODEL" | "PROVIDER_ERROR", message: string) { super(message); }
 }
 
-export const ROLE_QUOTAS: Record<string, { perMinute: number; perDay: number }> = {
-  SUPER_ADMIN: { perMinute: 60, perDay: 2000 }, ADMIN: { perMinute: 40, perDay: 1000 },
-  TEACHER: { perMinute: 20, perDay: 500 }, STUDENT: { perMinute: 10, perDay: 200 }, PARENT: { perMinute: 10, perDay: 200 },
-};
+/** Limites par rôle — source unique : ai-quota-manager.ts (réexport pour compatibilité publique). */
+export { ROLE_QUOTAS };
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const responseCache = new Map<string, { expiresAt: number; response: AiGatewayResponse }>();
-const quotaStore = new Map<string, { minuteStart: number; minute: number; day: string; daily: number }>();
 
 type ChatMessages = NonNullable<AiGatewayRequest["messages"]>;
 
-function checkAndRecordQuota(req: AiGatewayRequest) {
-  const key = `${req.environment}:${req.schoolId ?? "global"}:${req.userId}:${req.role.toUpperCase()}`;
-  const now = Date.now(); const day = new Date().toISOString().slice(0, 10);
-  const entry = quotaStore.get(key) ?? { minuteStart: now, minute: 0, day, daily: 0 };
-  if (now - entry.minuteStart >= 60_000) { entry.minuteStart = now; entry.minute = 0; }
-  if (entry.day !== day) { entry.day = day; entry.daily = 0; }
-  const limit = ROLE_QUOTAS[req.role.toUpperCase()] ?? ROLE_QUOTAS.TEACHER;
-  if (entry.minute >= limit.perMinute || entry.daily >= limit.perDay) throw new AiGatewayError("QUOTA_EXCEEDED", "Quota IA gratuit atteint pour cette periode.");
-  entry.minute += 1; entry.daily += 1; quotaStore.set(key, entry);
+/** Construit le contexte de quota depuis la requête (toutes les dimensions viennent du serveur). */
+function quotaContext(req: AiGatewayRequest): QuotaContext {
+  return {
+    userId: req.userId,
+    role: req.role,
+    schoolId: req.schoolId,
+    environment: req.environment,
+    provider: undefined,
+    model: req.model,
+    taskType: req.taskType,
+    capability: req.capability,
+  };
 }
+
+/**
+ * Contrôle persistant du quota AVANT tout appel provider.
+ * Lève AiGatewayError("QUOTA_EXCEEDED") si le quota est dépassé.
+ */
+async function checkAndRecordQuota(req: AiGatewayRequest): Promise<void> {
+  const ok = await checkAndReserve(quotaContext(req));
+  if (!ok) {
+    await recordUsage(quotaContext(req), { status: "quota_exceeded" });
+    throw new AiGatewayError("QUOTA_EXCEEDED", "Quota IA gratuit atteint pour cette periode.");
+  }
+}
+
 function cacheScope(req: AiGatewayRequest) { return `${req.environment}:${req.schoolId ?? "global"}:${req.role}:${req.userId}:${req.cacheKey ?? ""}`; }
 
 async function openRouterChat(messages: ChatMessages, model: string): Promise<AiGatewayResponse> {
@@ -64,6 +80,25 @@ async function geminiFreeChat(messages: ChatMessages, model: string): Promise<Ai
   try { return { content: await geminiChat(messages, { model, temperature: 0.4, maxTokens: 4000 }), provider: "gemini", source: "gemini", model, cached: false }; }
   catch { throw new AiGatewayError("PROVIDER_ERROR", "Le fournisseur Gemini est temporairement indisponible."); }
 }
+/**
+ * Adaptateur Ollama Cloud — exécuté DANS le pipeline gateway (quota/cache/audit/FREE-ONLY appliqués automatiquement).
+ * Le provider est additif : sans preuve FREE_VERIFIED (checkModelIsFree ci-dessous) le modèle est
+ * bloqué avant tout appel réseau. Aucune clé/secrète n'est jamais loggée ni renvoyée.
+ */
+async function ollamaChatAdapter(messages: ChatMessages, model: string): Promise<AiGatewayResponse> {
+  if (!checkModelIsFree("ollama", model).allowed) throw new AiGatewayError("PAID_OR_UNKNOWN_MODEL", "Le modèle Ollama demandé n'est pas confirmé gratuit.");
+  try {
+    const content = await ollamaChat(messages, model, { temperature: 0.4 });
+    return { content, provider: "ollama", source: "ollama", model, cached: false };
+  } catch (err) {
+    if (err instanceof OllamaProviderError) {
+      const mapped: Record<string, "RATE_LIMITED" | "PAID_OR_UNKNOWN_MODEL" | "PROVIDER_ERROR"> = { RATE_LIMITED: "RATE_LIMITED", MODEL_NOT_FOUND: "PAID_OR_UNKNOWN_MODEL" };
+      throw new AiGatewayError(mapped[err.code] ?? "PROVIDER_ERROR", err.message);
+    }
+    throw new AiGatewayError("PROVIDER_ERROR", "Le fournisseur Ollama est temporairement indisponible.");
+  }
+}
+
 
 /** OCR adapter -- delegates to geminiOcrGrades (vision). HF stays cost-guarded (UNKNOWN_PRICING). */
 async function geminiOcrAdapter(input: NonNullable<AiGatewayRequest["ocrInput"]>): Promise<AiGatewayResponse> {
@@ -88,33 +123,62 @@ async function geminiTranscribeAdapter(input: NonNullable<AiGatewayRequest["tran
   }
 }
 
+/** Convertit une erreur du Router en erreur Gateway normalisée. */
+function normalizeRouterError(err: unknown): never {
+  if (err instanceof AIRouterError) {
+    throw new AiGatewayError(
+      err.code === "PAID_OR_UNKNOWN_MODEL" ? "PAID_OR_UNKNOWN_MODEL" : "FREE_SERVICE_UNAVAILABLE",
+      err.message,
+    );
+  }
+  throw err;
+}
+
 /** OCR capability -- routes through gateway for FREE ONLY / quota / audit control. */
 async function aiGatewayOcr(req: AiGatewayRequest): Promise<AiGatewayResponse> {
   if (!req.ocrInput) throw new AiGatewayError("PROVIDER_ERROR", "Input OCR manquant.");
-  checkAndRecordQuota(req);
-  const decision = await aiRouter({
-    taskType: req.taskType,
-    capability: "ocr",
-    requestedModel: req.model,
-    userContext: { userId: req.userId, role: req.role, schoolId: req.schoolId },
-    environment: req.environment,
-  });
-  if (decision.provider === "gemini") return await geminiOcrAdapter(req.ocrInput);
+  await checkAndRecordQuota(req);
+  let decision;
+  try {
+    decision = await aiRouter({
+      taskType: req.taskType,
+      capability: "ocr",
+      requestedModel: req.model,
+      userContext: { userId: req.userId, role: req.role, schoolId: req.schoolId },
+      environment: req.environment,
+    });
+  } catch (err) {
+    normalizeRouterError(err);
+  }
+  if (decision.provider === "gemini") {
+    const response = await geminiOcrAdapter(req.ocrInput);
+    await recordUsage({ ...quotaContext(req), provider: "gemini", model: GEMINI_VISION_MODEL }, { status: "success" });
+    return response;
+  }
   throw new AiGatewayError("FREE_SERVICE_UNAVAILABLE", "Aucun provider gratuit compatible OCR disponible.");
 }
 
 /** Transcribe capability -- routes through gateway for FREE ONLY / quota / audit control. */
 async function aiGatewayTranscribe(req: AiGatewayRequest): Promise<AiGatewayResponse> {
   if (!req.transcribeInput) throw new AiGatewayError("PROVIDER_ERROR", "Input transcription manquant.");
-  checkAndRecordQuota(req);
-  const decision = await aiRouter({
-    taskType: req.taskType,
-    capability: "transcribe",
-    requestedModel: req.model,
-    userContext: { userId: req.userId, role: req.role, schoolId: req.schoolId },
-    environment: req.environment,
-  });
-  if (decision.provider === "gemini") return await geminiTranscribeAdapter(req.transcribeInput);
+  await checkAndRecordQuota(req);
+  let decision;
+  try {
+    decision = await aiRouter({
+      taskType: req.taskType,
+      capability: "transcribe",
+      requestedModel: req.model,
+      userContext: { userId: req.userId, role: req.role, schoolId: req.schoolId },
+      environment: req.environment,
+    });
+  } catch (err) {
+    normalizeRouterError(err);
+  }
+  if (decision.provider === "gemini") {
+    const response = await geminiTranscribeAdapter(req.transcribeInput);
+    await recordUsage({ ...quotaContext(req), provider: "gemini", model: GEMINI_TEXT_MODEL }, { status: "success" });
+    return response;
+  }
   throw new AiGatewayError("FREE_SERVICE_UNAVAILABLE", "Aucun provider gratuit compatible transcription disponible.");
 }
 
@@ -126,18 +190,39 @@ export async function aiGateway(req: AiGatewayRequest): Promise<AiGatewayRespons
   const scopedKey = req.useCache && req.cacheKey ? cacheScope(req) : null;
   const cached = scopedKey ? responseCache.get(scopedKey) : undefined;
   if (cached && cached.expiresAt > Date.now()) return { ...cached.response, cached: true };
-  checkAndRecordQuota(req);
-  const decision = await aiRouter({
-    taskType: req.taskType,
-    capability: "chat",
-    requestedModel: req.model,
-    userContext: { userId: req.userId, role: req.role, schoolId: req.schoolId },
-    environment: req.environment,
-  });
+  await checkAndRecordQuota(req);
+  let decision;
+  try {
+    decision = await aiRouter({
+      taskType: req.taskType,
+      capability: "chat",
+      requestedModel: req.model,
+      userContext: { userId: req.userId, role: req.role, schoolId: req.schoolId },
+      environment: req.environment,
+    });
+  } catch (err) {
+    normalizeRouterError(err);
+  }
   for (const step of decision.fallbackChain) {
     try {
-      const response = step.provider === "gemini" ? await geminiFreeChat(req.messages!, step.model) : step.provider === "openrouter" ? await openRouterChat(req.messages!, step.model) : null;
-      if (response) { if (scopedKey) responseCache.set(scopedKey, { expiresAt: Date.now() + 300_000, response }); return response; }
+            const response =
+        step.provider === "gemini" ? await geminiFreeChat(req.messages!, step.model)
+        : step.provider === "openrouter" ? await openRouterChat(req.messages!, step.model)
+        : step.provider === "ollama" ? await ollamaChatAdapter(req.messages!, step.model)
+        : null;
+      if (response) {
+        if (scopedKey) responseCache.set(scopedKey, { expiresAt: Date.now() + 300_000, response });
+        await recordUsage(
+          { ...quotaContext(req), provider: step.provider, model: step.model },
+          {
+            status: "success",
+            inputTokens: response.usage?.inputTokens,
+            outputTokens: response.usage?.outputTokens,
+            totalTokens: response.usage?.totalTokens,
+          },
+        );
+        return response;
+      }
     } catch { /* essayer etape suivante */ }
   }
   throw new AiGatewayError("FREE_SERVICE_UNAVAILABLE", "Le service IA gratuit correspondant a cette tache est actuellement indisponible.");

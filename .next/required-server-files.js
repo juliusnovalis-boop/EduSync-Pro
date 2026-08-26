@@ -104,7 +104,7 @@ self.__SERVER_FILES_MANIFEST={
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "c:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
+    "outputFileTracingRoot": "C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -304,11 +304,11 @@ self.__SERVER_FILES_MANIFEST={
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "c:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro"
+      "root": "C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "c:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
+  "appDir": "C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro",
   "relativeAppDir": "",
   "files": [
     ".next\\routes-manifest.json",

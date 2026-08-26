@@ -35,6 +35,8 @@ export interface ModuleContext {
   registry: import("../kernel/registry").ModuleRegistry;
   capabilities: import("../kernel/capabilities").CapabilityCatalog;
   config: import("../kernel/config").ConfigManager;
+  /** Adapter IA centralisé (injecté par DI) — optionnel, backward-compatible. */
+  aiAdapter?: import("../../lib/server/adapters/ai-adapter").AIServiceAdapter;
 }
 
 export interface IModule {

@@ -8,7 +8,6 @@ import { aiConversations, aiConversationMessages, aiAccessLogs } from "@/db/sche
 import { can, normalizeRole } from "./rbac";
 import { verifySession, type VerifiedSession } from "./auth";
 import { detectEnvironment } from "./environment";
-import { getAiSettings, resolveProvider, detectAiProvider, geminiChat, hfChat, aiProviderLabel, readSecret } from "./ai";
 
 export type { VerifiedSession as AuthSession };
 
@@ -139,5 +138,3 @@ export async function listConversationMessages(
     created_at: r.created_at ?? "",
   }));
 }
-
-export { getAiSettings, resolveProvider, detectAiProvider, geminiChat, hfChat, aiProviderLabel, readSecret };

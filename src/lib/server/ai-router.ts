@@ -13,6 +13,7 @@
  */
 import { checkModelIsFree, resolveFreeModels, PROVIDER_PRIORITY, type AiProviderId, type AiTaskType, type AiCapability } from "./ai-policy";
 import { GEMINI_VISION_MODEL, GEMINI_TEXT_MODEL } from "./ai";
+import { resolveModelAlias } from "./ai-models";
 
 export interface AIRouterUserContext {
   userId: string;
@@ -52,9 +53,11 @@ export class AIRouterError extends Error {
   }
 }
 
-/** Providers candidats par capability (ceux qui ont un adaptateur d'exécution). */
+/** Providers candidats par capability (ceux qui ont un adaptateur d'exécution).
+ * 'ollama' n'est ajouté en candidat QUE si checkModelIsFree() le confirme gratuit ;
+ * sans preuve FREE_VERIFIED il est ignoré automatiquement (voir bloc demandé-explicite). */
 const CAPABILITY_PROVIDERS: Record<AiCapability, AiProviderId[]> = {
-  chat: ["gemini", "openrouter"],
+  chat: ["gemini", "openrouter", "ollama"],
   ocr: ["gemini"],
   transcribe: ["gemini"],
 };
@@ -75,13 +78,23 @@ export async function aiRouter(req: AIRouterRequest): Promise<AIRouterDecision> 
     ? [req.preferredProvider, ...PROVIDER_PRIORITY.filter((p: AiProviderId) => p !== req.preferredProvider)]
     : PROVIDER_PRIORITY;
 
-  // 1. Modèle demandé explicitement
+    // 1. Modèle demandé explicitement
   if (req.requestedModel) {
     for (const provider of candidates) {
       if (!CAPABILITY_PROVIDERS[cap].includes(provider)) continue;
-      const check = checkModelIsFree(provider, req.requestedModel);
+      let model = req.requestedModel;
+      // Pour Ollama, le client manipule un ALIAS pédagogique (education/reasoning…),
+      // jamais un identifiant brut. On résout l'alias vers l'ID réel, mais le passage
+      // final reste bloqué par checkModelIsFree() (gratuité non-prouvée) tant que le
+      // modèle n'est pas FREE_VERIFIED. Cela empêche toute contournement par ID.
+      if (provider === "ollama") {
+        const resolved = resolveModelAlias(req.requestedModel);
+        if (!resolved) continue; // alias/modèle inconnu du catalogue Ollama → ignorer ce provider
+        model = resolved;
+      }
+      const check = checkModelIsFree(provider, model);
       if (check.allowed) {
-        fallbackChain.push({ provider, model: req.requestedModel, reason: `Modèle demandé ${req.requestedModel} confirmé gratuit sur ${provider}` });
+        fallbackChain.push({ provider, model, reason: `Modèle demandé ${model} confirmé gratuit sur ${provider}` });
       }
     }
     if (fallbackChain.length === 0) {

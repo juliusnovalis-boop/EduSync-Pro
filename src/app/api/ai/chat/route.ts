@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { eq, and, desc as descDrizzle } from "drizzle-orm";
 import { aiConversations } from "@/db/schema";
 import { PERMISSIONS } from "@/lib/server/rbac";
+import { buildCopilotPrompt, classifyIntent } from "@/lib/server/ai-copilot";
 
 export const dynamic = "force-dynamic";
 
@@ -76,23 +77,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Message vide" }, { status: 400 });
   }
 
-  // Déterminer le type de tâche
+  // 1) Classification d'intention → niveau de traitement (FREE ONLY inchangé).
   const normRole = guard.ctx.role.toUpperCase();
-  let taskType: "quick" | "standard" | "analysis" = "standard";
-  if (normRole === "PARENT") taskType = "quick";
-  else if (normRole === "STUDENT") taskType = "quick";
-  else if (normRole === "ADMIN") taskType = "analysis";
-  else if (normRole === "SUPER_ADMIN") taskType = "analysis";
+  const intent = classifyIntent(message);
+  const taskType: "quick" | "standard" | "analysis" = intent;
 
-  // No broad database export: feature-specific authorized context will be added
-  // by dedicated tools, never by this generic conversational route.
-  const dataContext = `Rôle: ${normRole}. Réponds uniquement à partir de la question fournie; n'invente aucune donnée EduSync.`;
+  // 2) Contexte copilote : snapshot des données réellement autorisées (serveur).
+  let systemPrompt = "";
+  let sources: string[] = [];
+  try {
+    const copilot = await buildCopilotPrompt(guard.ctx, message);
+    systemPrompt = copilot.system;
+    sources = copilot.sources;
+  } catch { /* contexte indisponible → réponse sans données */ }
 
-  // Construction du message complet avec contexte
-  const fullPrompt = `${dataContext}\n\nQuestion de l'utilisateur :\n${message}\n\nRéponds de manière utile, concise et pédagogique.`;
+  // 3) Mémoire conversationnelle : historique existant en DB (20 derniers messages).
+  const history = body.conversationId
+    ? (await listConversationMessages(body.conversationId, 100)).slice(-20)
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role, content: m.content }))
+    : [];
+
+  // 4) Messages au provider : [system, ...historique, question]. Aucun appel direct.
+  const messages = [
+    ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+    ...history,
+    { role: "user", content: message },
+  ];
 
   try {
-    const response = await aiGateway({ userId: guard.ctx.userId, role: guard.ctx.role, schoolId: guard.ctx.schoolId, environment: guard.environment, taskType, messages: [{ role: "user", content: fullPrompt }], useCache: false });
+    const response = await aiGateway({ userId: guard.ctx.userId, role: guard.ctx.role, schoolId: guard.ctx.schoolId, environment: guard.environment, taskType, messages, useCache: false });
+
 
     // Persister la question utilisateur + réponse
     const userConvId = await saveAiMessage({
@@ -123,6 +138,8 @@ export async function POST(req: NextRequest) {
       aiEnabled: true,
       cached: response.cached,
       role: guard.ctx.role,
+      intent,
+      sources,
     });
   } catch (err) {
     if (err instanceof AiGatewayError) return NextResponse.json({ error: err.message, code: err.code }, { status: err.code === "QUOTA_EXCEEDED" || err.code === "RATE_LIMITED" ? 429 : err.code === "FREE_SERVICE_UNAVAILABLE" ? 503 : 400 });

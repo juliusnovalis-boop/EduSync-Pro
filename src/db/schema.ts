@@ -1,4 +1,4 @@
-import { pgTable, text, integer, numeric, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, numeric, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 /**
  * Schéma EduSync Pro (portage depuis Supabase).
@@ -508,3 +508,54 @@ export const aiAccessLogs = pgTable("ai_access_logs", {
   granted: boolean("granted").default(true),
   created_at: text("created_at"),
 });
+
+/* ====================================================================== *
+ *  MODULE 19 — QUOTAS IA PERSISTANTS (AIQuotaManager)
+ *  Compteurs atomiques par période (minute / jour) — multi-tenant, DEMO/OFFICIEL safe.
+ *  Clé logique unique : environment + school_id + user_id + role + period_type + period_key.
+ *  SUPER_ADMIN peut avoir school_id = null.
+ * ====================================================================== */
+
+export const aiUsageCounters = pgTable("ai_usage_counters", {
+  id: text("id").primaryKey(),
+  environment: text("environment").notNull(), // "demo" | "production"
+  school_id: text("school_id"), // null pour SUPER_ADMIN
+  user_id: text("user_id").notNull(),
+  role: text("role").notNull(), // SUPER_ADMIN | ADMIN | TEACHER | STUDENT | PARENT
+  period_type: text("period_type").notNull(), // "minute" | "day"
+  period_key: text("period_key").notNull(), // minute normalisée | YYYY-MM-DD
+  count: integer("count").notNull().default(0),
+  created_at: text("created_at"),
+  updated_at: text("updated_at"),
+}, (table) => [
+  // Clé logique unique : environment + school_id + user_id + role + period_type + period_key
+  uniqueIndex("ai_usage_counters_key_idx").on(
+    table.environment,
+    table.school_id,
+    table.user_id,
+    table.role,
+    table.period_type,
+    table.period_key,
+  ),
+]);
+
+/** Historique détaillé des appels IA (additif) — tokens NULL si indisponibles. */
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: text("id").primaryKey(),
+  environment: text("environment").notNull(), // "demo" | "production"
+  school_id: text("school_id"), // null pour SUPER_ADMIN
+  user_id: text("user_id").notNull(),
+  role: text("role").notNull(),
+  provider: text("provider"), // "gemini" | "openrouter" | "huggingface" | "local"
+  model: text("model"),
+  task_type: text("task_type"), // "quick" | "standard" | "analysis" | "vision" | "json" | "audio"
+  capability: text("capability"), // "chat" | "ocr" | "transcribe"
+  input_tokens: integer("input_tokens"),
+  output_tokens: integer("output_tokens"),
+  total_tokens: integer("total_tokens"),
+  status: text("status"), // "success" | "error" | "quota_exceeded"
+  created_at: text("created_at"),
+}, (table) => [
+  index("ai_usage_logs_user_idx").on(table.environment, table.school_id, table.user_id, table.created_at),
+  index("ai_usage_logs_school_idx").on(table.environment, table.school_id, table.created_at),
+]);

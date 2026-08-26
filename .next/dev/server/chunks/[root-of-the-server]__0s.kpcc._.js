@@ -37,7 +37,7 @@ module.exports = mod;
 }),
 "[project]/src/app/api/ai/route.ts [app-route] (ecmascript)", ((__turbopack_context__, module, exports) => {
 
-const e = new Error("Could not parse module '[project]/src/app/api/ai/route.ts', file not found");
+const e = new Error("Could not parse module '[project]/src/app/api/ai/route.ts'\n\nExpression expected");
 e.code = 'MODULE_UNPARSABLE';
 throw e;
 }),

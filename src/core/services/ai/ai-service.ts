@@ -1,4 +1,5 @@
-import { generateAnalysis } from "@/lib/server/ai";
+import { AIServiceAdapter, type AiAdapterContext } from "@/lib/server/adapters/ai-adapter";
+import { buildDataContext, buildSystemPrompt } from "@/lib/server/ai";
 import type { IModule, ModuleContext } from "../../interfaces";
 import { CAPABILITIES } from "../../kernel/capabilities";
 import type { EventBus } from "../../kernel/event-bus";
@@ -9,11 +10,25 @@ import type { AnalysisParams, IAIProvider, OcrInput, OcrResult } from "./ai-prov
  * Service IA = façade unique pour les capacités liées à l'IA.
  * - Résout le provider actif via le registry (1 source de vérité, plus de if/else).
  * - Émet des événements Core (ai.analysis.*) pour un traitement découplé.
- * - Fournit une dégradation gracieuse (analyse locale) en cas d'échec provider.
  *
- * P1 : analyze() délègue à generateAnalysis (compatibilité, ai.ts intact).
- * P2 : les routes /api/ai, /api/ocr, /api/transcribe appelleront ce service.
+ * ⚠ Phase 5B.1 — Fermeture définitive des bypass :
+ * Les méthodes analyze() / extractGrades() / transcribe() ne peuvent PLUS
+ * exécuter un provider distant lorsqu'aucun AIServiceAdapter n'est disponible.
+ *
+ * Architecture obligatoire (aucun chemin alternatif) :
+ *   Core (AIService) → AIServiceAdapter → aiGateway → aiRouter → aiPolicy → Provider
+ *
+ * Sans adaptateur (contexte Gateway manquant) : erreur contrôlée AiContextRequiredError.
+ * Aucun fallback automatique vers generateAnalysis()/geminiChat()/hfChat()/…
+ * n'est plus autorisé ici.
  */
+export class AiContextRequiredError extends Error {
+  constructor() {
+    super("AI context required — AIServiceAdapter (userId, role, schoolId, environment) obligatoire avant tout appel distant IA.");
+    this.name = "AiContextRequiredError";
+  }
+}
+
 export class AIService implements IModule {
   readonly id = "ai";
   readonly name = "Analyse & IA";
@@ -23,9 +38,41 @@ export class AIService implements IModule {
 
   private bus: EventBus | null = null;
   readonly providers = new AIProviderRegistry();
+  private adapter: AIServiceAdapter | null = null;
 
   initialize(ctx: ModuleContext) {
     this.bus = ctx.eventBus;
+    // Récupère un adapter préalablement enregistré (DI) s'il existe.
+    const registered = (ctx as ModuleContext & { aiAdapter?: AIServiceAdapter }).aiAdapter;
+    if (registered) this.adapter = registered;
+  }
+
+  /** Injecte l'adapter centralisé (via DI ou composition). */
+  useAdapter(adapter: AIServiceAdapter): this {
+    this.adapter = adapter;
+    return this;
+  }
+
+  /** Configure le contexte IA sur l'adapter (auth + environnement). */
+  setAdapterContext(ctx: AiAdapterContext): this {
+    if (this.adapter) this.adapter.setContext(ctx);
+    return this;
+  }
+
+  hasAdapter(): boolean {
+    return this.adapter !== null && this.adapter.hasContext();
+  }
+
+  /**
+   * L'adapter est OBLIGATOIRE pour toute exécution distante.
+   * Refus systématique si absent ou sans contexte (aucun environment implicite).
+   */
+  private requireAdapter(): AIServiceAdapter {
+    const adapter = this.adapter;
+    if (!adapter || !adapter.hasContext()) {
+      throw new AiContextRequiredError();
+    }
+    return adapter;
   }
 
   registerProvider(provider: IAIProvider): this {
@@ -48,7 +95,16 @@ export class AIService implements IModule {
   async analyze(params: AnalysisParams) {
     this.bus?.emit("ai.analysis.started", { term: params.term });
     try {
-      const result = await generateAnalysis(params); // P1 : orchestration existante (Gemini→HF→local)
+      const adapter = this.requireAdapter();
+      const dataContext = buildDataContext(params);
+      const systemPrompt = buildSystemPrompt();
+      const result = await adapter.analyze({
+        term: params.term,
+        termLabel: params.termLabel,
+        focus: params.focus,
+        dataContext,
+        systemPrompt,
+      });
       this.bus?.emit("ai.analysis.completed", { source: result.source, model: result.model });
       return result;
     } catch (error) {
@@ -57,21 +113,19 @@ export class AIService implements IModule {
     }
   }
 
-  /** OCR : premier provider visuel disponible (remplace le if/else de /api/ocr). */
+  /** OCR : chef centralisé uniquement (adapter → aiGateway). Aucun provider direct. */
   async extractGrades(input: OcrInput): Promise<OcrResult> {
-    const provider = this.providers.resolveByCapability("vision");
-    if (!provider?.extractGrades) {
-      throw new Error("OCR indisponible : configurez GEMINI_API_KEY ou HF_TOKEN.");
-    }
-    return provider.extractGrades(input);
+    const adapter = this.requireAdapter();
+    return adapter.extractGrades({
+      imageDataUrl: input.imageDataUrl,
+      students: input.students,
+    });
   }
 
-  /** Transcription : premier provider audio disponible (remplace le if/else de /api/transcribe). */
+  /** Transcription : chef centralisé uniquement (adapter → aiGateway). Aucun provider direct. */
   async transcribe(buffer: Buffer, mimeType: string): Promise<string> {
-    const provider = this.providers.resolveByCapability("audio");
-    if (!provider?.transcribe) {
-      throw new Error("Transcription indisponible : configurez GEMINI_API_KEY ou HF_TOKEN.");
-    }
-    return provider.transcribe(buffer, mimeType);
+    const adapter = this.requireAdapter();
+    const audioBase64 = buffer.toString("base64");
+    return adapter.transcribe({ audioBase64, mimeType });
   }
 }

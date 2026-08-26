@@ -3,6 +3,9 @@ import { Database, RotateCcw, Save, Settings as SettingsIcon, Sparkles, UserCog,
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PageHeader, Pill, SectionCard } from "../components/ui-kit";
+import AiUsageCard from "../components/AiUsageCard";
+import AiProviderCatalogCard from "../components/AiProviderCatalogCard";
+import AiHealthCard from "../components/AiHealthCard";
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { ROLE_LABELS, type AcademicYear } from "../lib/types";
@@ -365,6 +368,11 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
       )}
+
+      {can("audit.read") && <AiUsageCard />}
+      {can("audit.read") && <AiProviderCatalogCard />}
+
+      {session?.role === "SUPER_ADMIN" && <AiHealthCard />}
 
       {isSuperAdmin && (
         <SectionCard title="Sécurité — Super Admin" description="Modifiez votre mot de passe et votre e-mail de connexion." icon={Lock}>

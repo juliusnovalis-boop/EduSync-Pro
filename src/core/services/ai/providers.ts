@@ -1,9 +1,18 @@
 /**
  * Implémentations concrètes des IAIProvider.
  *
- * ⚠ Phase 1 (compatibilité) : ces providers **délèguent** aux fonctions existantes
- * de `@/lib/server/ai`. Cela évite toute duplication ET toute modification de ai.ts.
- * En Phase 2, la logique migrera DANS ces providers et ai.ts deviendra une façade fine.
+ * ⚠ Phase 5B.1 — Ces classes sont désormais INERTES pour l'exécution :
+ * - AIService exige un AIServiceAdapter (contexte Gateway) pour tout appel distant ;
+ * - les chemins d'exécution legacy (chat/extractGrades/transcribe) ne sont plus
+ *   invoqués par le Core : plus aucun bypass possible vers geminiChat/hfChat/…
+ *   hors aiGateway.
+ *
+ * Elles restent exportées UNIQUEMENT pour :
+ * - inspection/diagnostic (`available()`/`label()`/`priority()` dans core/status) ;
+ * - compatibilité du barrel public `@/core` avec les modules non IA.
+ *
+ * Aucun code d'appel distant ne doit repasser par ces classes ; toute exécution
+ * IA distante transite obligatoirement par : AIService → AIServiceAdapter → aiGateway.
  */
 import {
   geminiKey,

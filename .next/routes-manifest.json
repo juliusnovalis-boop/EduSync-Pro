@@ -90,6 +90,18 @@
       "namedRegex": "^/api/ai(?:/)?$"
     },
     {
+      "page": "/api/ai/audit",
+      "regex": "^/api/ai/audit(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai/audit(?:/)?$"
+    },
+    {
+      "page": "/api/ai/catalog",
+      "regex": "^/api/ai/catalog(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai/catalog(?:/)?$"
+    },
+    {
       "page": "/api/ai/chat",
       "regex": "^/api/ai/chat(?:/)?$",
       "routeKeys": {},
@@ -100,6 +112,18 @@
       "regex": "^/api/ai/gateway(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/ai/gateway(?:/)?$"
+    },
+    {
+      "page": "/api/ai/health",
+      "regex": "^/api/ai/health(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai/health(?:/)?$"
+    },
+    {
+      "page": "/api/ai/usage",
+      "regex": "^/api/ai/usage(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai/usage(?:/)?$"
     },
     {
       "page": "/api/audit",

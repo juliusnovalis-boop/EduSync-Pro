@@ -1,6 +1,6 @@
 var R=require("../../../chunks/[turbopack]_runtime.js")("server/app/api/ocr/route.js")
-R.c("server/chunks/src_app_api_ocr_route_ts_00xw2u1._.js")
-R.c("server/chunks/[root-of-the-server]__0d4fldi._.js")
+R.c("server/chunks/src_app_api_ocr_route_ts_0j8gbwr._.js")
+R.c("server/chunks/[root-of-the-server]__03rooz5._.js")
 R.c("server/chunks/node_modules_next_0~c0m97._.js")
 R.c("server/chunks/node_modules_drizzle-orm_0hyzoh1._.js")
 R.c("server/chunks/[externals]_pg_0.id537._.js")
