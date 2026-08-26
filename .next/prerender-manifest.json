@@ -2,6 +2,10 @@
   "version": 4,
   "routes": {
     "/": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6735,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -26,6 +30,10 @@
       ]
     },
     "/_global-error": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 8953,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -51,6 +59,10 @@
     },
     "/_not-found": {
       "initialStatus": 404,
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 8138,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -75,6 +87,10 @@
       ]
     },
     "/access": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6747,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -99,6 +115,10 @@
       ]
     },
     "/assignments": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6757,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -123,6 +143,10 @@
       ]
     },
     "/attendance": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6755,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -147,6 +171,10 @@
       ]
     },
     "/auth": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6743,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -171,6 +199,10 @@
       ]
     },
     "/bulletins": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6753,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -195,6 +227,10 @@
       ]
     },
     "/calendar": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6751,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -219,6 +255,10 @@
       ]
     },
     "/classes": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6749,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -243,6 +283,10 @@
       ]
     },
     "/communication": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6761,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -267,6 +311,10 @@
       ]
     },
     "/dashboard": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6753,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -291,6 +339,10 @@
       ]
     },
     "/demo": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6743,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -315,6 +367,10 @@
       ]
     },
     "/document-studio": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6765,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -339,6 +395,10 @@
       ]
     },
     "/documents": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6753,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -363,6 +423,10 @@
       ]
     },
     "/establishments": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6763,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -387,6 +451,10 @@
       ]
     },
     "/grades": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6747,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -411,6 +479,10 @@
       ]
     },
     "/ia-analysis": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6757,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -435,6 +507,10 @@
       ]
     },
     "/ocr-grades": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6755,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -459,6 +535,10 @@
       ]
     },
     "/payments": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6751,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -483,6 +563,10 @@
       ]
     },
     "/print-center": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6759,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -507,6 +591,10 @@
       ]
     },
     "/qr-attendance": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6761,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -531,6 +619,10 @@
       ]
     },
     "/qr-center": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6753,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -555,6 +647,10 @@
       ]
     },
     "/ranking": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6749,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -579,6 +675,10 @@
       ]
     },
     "/reports": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6749,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -603,6 +703,10 @@
       ]
     },
     "/scanner": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6749,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -627,6 +731,10 @@
       ]
     },
     "/settings": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6751,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -651,6 +759,10 @@
       ]
     },
     "/student-cards": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6761,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -675,6 +787,10 @@
       ]
     },
     "/students": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6751,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -699,6 +815,10 @@
       ]
     },
     "/subjects": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6751,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -723,6 +843,10 @@
       ]
     },
     "/teachers": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6751,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -747,6 +871,10 @@
       ]
     },
     "/timetable": {
+      "routeType": "page",
+      "response": "complete",
+      "compute": "static",
+      "htmlSize": 6753,
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -773,6 +901,9 @@
   },
   "dynamicRoutes": {
     "/[[...all]]": {
+      "routeType": "page",
+      "response": "empty",
+      "compute": "blocking",
       "experimentalBypassFor": [
         {
           "type": "header",

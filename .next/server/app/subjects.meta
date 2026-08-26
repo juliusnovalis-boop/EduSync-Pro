@@ -7,9 +7,20 @@
   "segmentPaths": [
     "/_tree",
     "/_full",
-    "/$oc$all/__PAGE__",
-    "/$oc$all",
-    "/_index",
-    "/_head"
-  ]
+    "/$oc$all/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 160,
+            "slots": null
+          }
+        }
+      }
+    }
+  }
 }

@@ -5,9 +5,11 @@
   "devFiles": [],
   "polyfillFiles": [],
   "lowPriorityFiles": [
-    "static/nNwgpiLaphXJK9p450Th8/_buildManifest.js",
-    "static/nNwgpiLaphXJK9p450Th8/_ssgManifest.js",
-    "static/nNwgpiLaphXJK9p450Th8/_clientMiddlewareManifest.js"
+    "static/iVRCnPMtPwW877_XywkkZ/_buildManifest.js",
+    "static/iVRCnPMtPwW877_XywkkZ/_ssgManifest.js",
+    "static/iVRCnPMtPwW877_XywkkZ/_clientMiddlewareManifest.js"
   ],
-  "rootMainFiles": []
+  "rootMainFiles": [],
+  "rootMainFilesTree": {},
+  "pagesChunkGroupBootstrapParams": {}
 }
