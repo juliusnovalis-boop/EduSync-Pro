@@ -21,11 +21,16 @@
   "/api/data/[table]/[id]/route": "app/api/data/[table]/[id]/route.js",
   "/api/data/[table]/route": "app/api/data/[table]/route.js",
   "/api/health/route": "app/api/health/route.js",
+  "/api/knowledge/file/[id]/route": "app/api/knowledge/file/[id]/route.js",
+  "/api/knowledge/history/route": "app/api/knowledge/history/route.js",
+  "/api/knowledge/route": "app/api/knowledge/route.js",
   "/api/notifications/[id]/route": "app/api/notifications/[id]/route.js",
   "/api/notifications/route": "app/api/notifications/route.js",
   "/api/ocr/route": "app/api/ocr/route.js",
   "/api/seed/route": "app/api/seed/route.js",
   "/api/settings/route": "app/api/settings/route.js",
+  "/api/students/directory/route": "app/api/students/directory/route.js",
+  "/api/tools/[tool]/route": "app/api/tools/[tool]/route.js",
   "/api/transcribe/route": "app/api/transcribe/route.js",
   "/api/verify-qr/[token]/route": "app/api/verify-qr/[token]/route.js"
 }

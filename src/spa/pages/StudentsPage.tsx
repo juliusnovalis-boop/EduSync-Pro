@@ -16,6 +16,7 @@ export default function StudentsPage() {
       subtitle="Répertoire des élèves inscrits dans l'établissement"
       singular="Élève"
       icon={Users}
+      createBlocked="La création d'un élève (compte + fiche) se fait via Gestion des accès."
       toolbar={<ImportExport table="students" filename="eleves-edusync.csv" label="élève(s)" columns={[
         { key: "first_name", label: "Prénom" }, { key: "last_name", label: "Nom" }, { key: "gender", label: "Genre" },
         { key: "birth_date", label: "Date naissance" }, { key: "matricule", label: "Matricule" }, { key: "class_id", label: "Classe ID" },
@@ -40,6 +41,20 @@ export default function StudentsPage() {
         { header: "Élève", render: (r) => <span className="flex items-center gap-3"><span className="flex size-9 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">{r.first_name.slice(0, 1)}{r.last_name.slice(0, 1)}</span><span><span className="block font-semibold">{fullName(r)}</span><span className="block text-xs text-muted-foreground">{r.matricule ?? "—"}</span></span></span> },
         { header: "Genre", render: (r) => (r.gender === "F" ? "Féminin" : "Masculin") },
         { header: "Classe", render: (r) => (r.class_id ? (classById.get(r.class_id) ?? "—") : "—") },
+        { header: "Compte", render: (r) => r.user_id ? (
+          <span className="flex flex-col gap-0.5">
+            {r.login_id ? (
+              <>
+                <Pill tone="success">Compte lié</Pill>
+                <span className="font-mono text-xs text-muted-foreground">{r.login_id}</span>
+              </>
+            ) : (
+              <Pill tone="warning">Profil à compléter</Pill>
+            )}
+          </span>
+        ) : (
+          <Pill tone="warning">À réconcilier</Pill>
+        ) },
         { header: "Parent", render: (r) => <span><span className="block">{r.parent_name ?? "—"}</span><span className="block text-xs text-muted-foreground">{r.parent_phone ?? ""}</span></span> },
         { header: "Statut", render: (r) => <Pill tone={r.status === "actif" ? "success" : "warning"}>{r.status}</Pill> },
       ]}

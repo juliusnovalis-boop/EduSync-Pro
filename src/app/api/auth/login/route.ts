@@ -77,8 +77,11 @@ export async function POST(req: NextRequest) {
 
     // Le jeton est remis via un cookie HttpOnly (jamais lisible par JavaScript).
     // Le corps de réponse transporte uniquement les infos de session (sans jeton).
+    // Mobile (Expo/RN) : le jeton est également exposé dans le corps (`token`)
+    // pour être utilisé en `Authorization: Bearer`. Le client web l'ignore.
     const res = NextResponse.json({
       ok: true,
+      token: created.token,
       session: {
         userId: user.id,
         loginId: user.login_id,

@@ -21,8 +21,13 @@ export async function PUT(req: NextRequest) {
   try {
     const body = (await req.json()) as { provider?: string; model?: string; length?: string };
     if (body.model) {
-      const provider = body.provider === "openrouter" ? "openrouter" : "gemini";
-      if (!checkModelIsFree(provider as AiProviderId, body.model).allowed) {
+      // FREE ONLY s'applique au MODÈLE, pas au provider : on résout le provider
+      // réellement voulu (y compris tokenin / ollama) avant la vérification de
+      // gratuité. 'auto' / tout autre choix tombe sur gemini (comportement historique).
+      const provider = (body.provider === "openrouter" || body.provider === "tokenin" || body.provider === "ollama" || body.provider === "gemini")
+        ? (body.provider as AiProviderId)
+        : "gemini";
+      if (!checkModelIsFree(provider, body.model).allowed) {
         return NextResponse.json({ error: "Modèle payant ou de prix inconnu : configuration refusée." }, { status: 400 });
       }
     }

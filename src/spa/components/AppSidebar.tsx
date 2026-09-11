@@ -28,8 +28,10 @@ import {
   Bell,
   BotMessageSquare,
   type LucideIcon,
+  Wrench,
+  Library,
 } from "lucide-react";
-import { SCHOOL_YEAR, PERM } from "../lib/types";
+import { PERM } from "../lib/types";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/auth";
 
@@ -64,6 +66,8 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Calendrier", url: "/calendar", icon: CalendarRange, permission: PERM.DASHBOARD_VIEW },
   { title: "Établissements", url: "/establishments", icon: Building2, permission: PERM.SCHOOLS_READ },
   { title: "Gestion des accès", url: "/access", icon: ShieldCheck, permission: PERM.USERS_CREATE },
+  { title: "EduSync Tools", url: "/tools", icon: Wrench, permission: PERM.TOOLS_USE },
+  { title: "EduSync Knowledge", url: "/knowledge", icon: Library, permission: PERM.KNOWLEDGE_READ },
   { title: "Paramètres", url: "/settings", icon: Settings, permission: PERM.DASHBOARD_VIEW },
 ];
 
@@ -100,18 +104,11 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               )
             }
           >
-            <item.icon className="size-4" />
+            <item.icon className="size-5 shrink-0" />
             <span>{item.title}</span>
           </NavLink>
         ))}
       </nav>
-
-      <div className="p-3">
-        <div className="rounded-xl bg-accent px-4 py-3">
-          <p className="text-xs font-medium text-muted-foreground">Année scolaire</p>
-          <p className="text-sm font-bold text-accent-foreground">{SCHOOL_YEAR.replace("-", " — ")}</p>
-        </div>
-      </div>
     </div>
   );
 }

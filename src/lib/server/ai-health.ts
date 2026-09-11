@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { aiUsageCounters, aiUsageLogs } from "@/db/schema";
 import { PROVIDER_PRIORITY, listProviders, checkModelIsFree, type AiProviderId } from "./ai-policy";
 import { ROLE_QUOTAS, getUsage } from "./ai-quota-manager";
+import { tokeninListModels, tokeninCatalogSource } from "./providers/tokenin-provider";
 
 /** Modèle sonde gratuit canonique par provider (vérification de politique uniquement). */
 const FREE_PROBE_MODEL: Record<AiProviderId, string | null> = {
@@ -15,6 +16,7 @@ const FREE_PROBE_MODEL: Record<AiProviderId, string | null> = {
   openrouter: "openrouter/free",
   huggingface: null,
   ollama: null,
+  tokenin: null, // Decouvert dynamique via API
 };
 
 export type AiHealthReport = {
@@ -102,22 +104,49 @@ export async function getAiHealth(environment: "demo" | "production"): Promise<A
     report.quota.managerOperational = false;
   }
 
-  // 4) PROVIDERS — état statique uniquement (aucun appel réel, aucune facturation)
+  // 4) PROVIDERS — statut cohérent : FREE ONLY s'applique au MODÈLE, jamais au provider.
   const infos = listProviders();
+  // Sonde dynamique TOKEN FREE IA : le catalogue réel expose des modèles à coût nul.
+  let tokeninFreeModels: string[] = [];
+  let tokeninTotal = 0;
+  let tokeninSource: "api" | "fallback" = "fallback";
+  try {
+    const all = await tokeninListModels();
+    tokeninTotal = all.length;
+    // La gratuité vient des métadonnées réelles (freeStatus), pas du suffixe.
+    tokeninFreeModels = all.filter((m) => m.freeStatus === "FREE").map((m) => m.id);
+    tokeninSource = tokeninCatalogSource();
+  } catch { /* service indisponible → UNAVAILABLE */ }
   for (const id of PROVIDER_PRIORITY) {
     const info = infos.find((p) => p.id === id);
-    const probe = FREE_PROBE_MODEL[id];
-    const freeAllowed = probe !== null ? checkModelIsFree(id, probe).allowed : false;
+    let freeAllowed = false;
     let status = "not_configured";
     let reason: string | undefined;
     if (!info?.configured) {
       status = "not_configured";
       reason = "NO_API_KEY";
-    } else if (!freeAllowed) {
-      status = "blocked";
-      reason = "FREE_POLICY_BLOCKED";
+    } else if (id === "tokenin") {
+      if (tokeninFreeModels.length > 0) {
+        freeAllowed = checkModelIsFree("tokenin", tokeninFreeModels[0]).allowed;
+        status = freeAllowed ? "ready" : "NO_FREE_MODEL";
+        if (!freeAllowed) reason = "NO_FREE_MODEL";
+      } else {
+        // Aucun modèle gratuit confirmé. Un catalogue momentanément indisponible
+        // ne doit jamais signifier "Bloqué par FREE ONLY" :
+        //  - aucun catalogue chargé (indisponible, source de secours) => TOKEN_FREE_UNAVAILABLE
+        //  - catalogue chargé mais aucun modèle gratuit => NO_FREE_MODEL
+        status = "unavailable";
+        reason = tokeninTotal === 0 && tokeninSource === "fallback" ? "TOKEN_FREE_UNAVAILABLE" : "NO_FREE_MODEL";
+      }
     } else {
-      status = "ready";
+      const probe = FREE_PROBE_MODEL[id];
+      freeAllowed = probe !== null ? checkModelIsFree(id, probe).allowed : false;
+      if (!freeAllowed) {
+        status = "blocked";
+        reason = "FREE_POLICY_BLOCKED";
+      } else {
+        status = "ready";
+      }
     }
     report.providers.push({
       id,

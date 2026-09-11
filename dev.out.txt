@@ -1,0 +1,38 @@
+
+> dev
+> next dev
+
+▲ Next.js 16.4.0-canary.12 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.2.0.2:3000
+- Environments: .env.local, .env
+✓ Ready in 1568ms
+✓ Running next.config.ts took 450ms
+Creating turbopack project {
+  dir: 'C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro',
+  testMode: true
+}
+
+ GET /api/health 200 in 966ms (next.js: 635ms, application-code: 331ms)
+ POST /api/auth/login 401 in 476ms (next.js: 149ms, application-code: 327ms)
+ POST /api/auth/login 401 in 338ms (next.js: 3ms, application-code: 335ms)
+ POST /api/auth/login 200 in 1319ms (next.js: 3ms, application-code: 1316ms)
+ POST /api/auth/login 200 in 872ms (next.js: 19ms, application-code: 853ms)
+ GET /api/auth/me 200 in 358ms (next.js: 327ms, application-code: 30ms)
+ GET /api/health 200 in 235ms (next.js: 8ms, application-code: 227ms)
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\.next\\server\\chunks\\[root-of-the-server]__1ncoborbou4ms._.js.map").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\.next").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\typescript\\lib\\cs").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\typescript\\lib\\ko\\diagnosticMessages.generated.json").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\typescript\\lib\\pt-br").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\typescript\\lib").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\out\\settings\\__next._tree.txt").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\.git\\objects\\aa\\tmp_obj_HDPiDX").
+ GET /api/health 200 in 330ms (next.js: 53ms, application-code: 277ms)
+ GET /api/health 200 in 31ms (next.js: 8ms, application-code: 23ms)
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (1.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\typescript\\lib\\lib.es2022.string.d.ts").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\.agent-cli-detector-Lkc47emi\\README.md").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (1.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\@expo\\.config-plugins-X2koeMmm\\node_modules\\semver\\range.bnf").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (3.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\LENOVO\\Downloads\\agon-agent_2-f2762693\\EduSync Pro\\node_modules\\.react-native-k8WOal6K\\ReactCommon\\jsinspector-modern").

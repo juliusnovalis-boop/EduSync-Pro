@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,94060,t=>{"use strict";var e=t.i(73134);async function a(t){let a=await e.default.toDataURL(t,{width:512,margin:2}),r=await (await fetch(a)).blob();return{url:URL.createObjectURL(r),name:"qrcode.png"}}t.s(["generateQr",0,a])}]);

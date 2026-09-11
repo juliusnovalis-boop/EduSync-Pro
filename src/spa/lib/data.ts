@@ -25,6 +25,8 @@ export type TableName =
   | "attendance_qr_records"
   | "qr_scan_history"
   | "parent_student_links"
+  | "teacher_establishment_assignments"
+  | "teacher_class_assignments"
   | "notifications"
   | "ai_conversations"
   | "ai_conversation_messages"

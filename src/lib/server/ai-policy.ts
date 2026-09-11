@@ -7,13 +7,14 @@
  */
 import { readSecret } from "./ai";
 import { ollamaPlan, fetchOllamaAccountModels, ollamaCachedAccountModels, invalidateOllamaTags } from "./ollama-catalog";
+import { isTokeninConfigured, tokeninListModels, tokeninIsFreeModel, invalidateTokeninModelsCache } from "./providers/tokenin-provider";
 
-export type AiProviderId = "gemini" | "openrouter" | "huggingface" | "ollama";
+export type AiProviderId = "gemini" | "openrouter" | "huggingface" | "ollama" | "tokenin";
 export type AiTaskType = "quick" | "standard" | "analysis" | "vision" | "json" | "audio";
 export type AiCapability = "chat" | "ocr" | "transcribe";
 export interface AiProviderInfo { id: AiProviderId; label: string; priority: number; configured: boolean; enabled: boolean; }
 
-export const PROVIDER_PRIORITY: AiProviderId[] = ["gemini", "openrouter", "huggingface", "ollama"];
+export const PROVIDER_PRIORITY: AiProviderId[] = ["gemini", "openrouter", "huggingface", "ollama", "tokenin"];
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const METADATA_TTL_MS = 15 * 60_000;
 
@@ -28,6 +29,7 @@ const FREE_POLICY: Record<AiProviderId, { enabled: boolean; fallbackModels: stri
   openrouter: { enabled: true, fallbackModels: ["openrouter/free"] },
   huggingface: { enabled: true, fallbackModels: [], requiresCostVerification: true },
   ollama: { enabled: true, fallbackModels: [], requiresCostVerification: true },
+  tokenin: { enabled: true, fallbackModels: [] },
 };
 
 /** Modèles Ollama explicitement vérifiés gratuits — preuve HUMAINE configurée par
@@ -46,13 +48,14 @@ function configured(provider: AiProviderId) {
     case "gemini": return Boolean(readSecret(["GEMINI_API_KEY"]));
     case "openrouter": return Boolean(readSecret(["OPENROUTER_API_KEY"]));
     case "ollama": return Boolean(readSecret(["OLLAMA_API_KEY"]));
+    case "tokenin": return Boolean(readSecret(["TOKEN_API_KEY"]));
     default: return Boolean(readSecret(["HF_TOKEN"]));
   }
 }
 function providerEnabled(provider: AiProviderId) { return FREE_POLICY[provider].enabled && configured(provider); }
 
 export function listProviders(): AiProviderInfo[] {
-  const labelFor: Record<string, string> = { gemini: "Google Gemini", openrouter: "OpenRouter Free", ollama: "Ollama Cloud" };
+  const labelFor: Record<string, string> = { gemini: "Google Gemini", openrouter: "OpenRouter Free", ollama: "Ollama Cloud", tokenin: "TOKEN FREE IA" };
   return PROVIDER_PRIORITY.map((id, index) => ({ id, label: labelFor[id] ?? id, priority: index + 1, configured: configured(id), enabled: providerEnabled(id) }));
 }
 
@@ -72,6 +75,14 @@ export function checkModelIsFree(provider: AiProviderId, model: string) {
     }
     // Sinon : pricing cloud inconnu/non prouvé gratuit → BLOQUÉ strict.
     return { allowed: false as const, reason: "UNKNOWN_PRICING" };
+  }
+  if (provider === "tokenin") {
+    // FREE ONLY : un modèle TOKENIN n'est accepté que s'il est confirmé gratuit
+    // par les métadonnées réelles (suffixe `-free` officiel OU tarifs à zéro).
+    // Tout modèle payant (PAID/UNKNOWN) est refusé.
+    return tokeninIsFreeModel(id)
+      ? { allowed: true as const, reason: "FREE_VERIFIED" }
+      : { allowed: false as const, reason: "UNKNOWN_PRICING" };
   }
   return { allowed: false as const, reason: "UNKNOWN_PRICING" };
 }
@@ -116,9 +127,20 @@ export async function resolveFreeModels(provider: AiProviderId): Promise<ModelMe
     } else {
       models = OLLAMA_FREE_VERIFIED_MODELS.map((id) => ({ id, capabilities: ["chat"], verifiedFree: true, checkedAt: Date.now() }));
     }
+  } else if (provider === "tokenin" && configured(provider)) {
+    // Découverte réelle du catalogue TOKENIN — seuls les modèles dont les
+    // métadonnées confirment la gratuité (freeStatus === "FREE") sont retenus.
+    // Les modèles PAID/UNKNOWN ne sont JAMAIS déclarés gratuits.
+    try {
+      const list = await tokeninListModels();
+      models = list
+        .filter((m) => m.freeStatus === "FREE")
+        .map((m) => ({ id: m.id, capabilities: m.capabilities.length > 0 ? m.capabilities : ["chat"], verifiedFree: true, checkedAt: Date.now() }));
+    } catch { models = []; }
   }
   metadataCache.set(provider, { checkedAt: Date.now(), models });
   return models;
 }
 
-export function invalidateModelMetadata(provider?: AiProviderId) { if (provider) metadataCache.delete(provider); else metadataCache.clear(); }
+export function invalidateModelMetadata(provider?: AiProviderId) { if (provider) { metadataCache.delete(provider); if (provider === "tokenin") invalidateTokeninModelsCache(); } else { metadataCache.clear(); invalidateTokeninModelsCache(); } }
+

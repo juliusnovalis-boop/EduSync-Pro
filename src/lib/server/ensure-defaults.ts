@@ -38,7 +38,11 @@ async function ensureUser(spec: AccountSpec) {
   });
 }
 
-export async function ensureAppDefaults() {
+let appDefaultsPromise: Promise<void> | null = null;
+
+// Corps réel d'amorçage — appelé UNE SEULE fois par processus via le cache
+// `ensureAppDefaults` (voir en fin de fichier).
+async function ensureAppDefaultsUncached() {
   // Amorce le schéma de démonstration si l'on opère en environnement démo.
   await ensureCurrentSchema();
   const now = new Date().toISOString();
@@ -114,4 +118,21 @@ export async function ensureAppDefaults() {
       created_by: null,
     });
   }
+}
+/**
+ * Garantit que l'amorçage des paramètres/comptes/année par défaut n'est exécuté
+ * QU'UNE fois par processus (Promise en vol, double-checked lock). Le premier
+ * appel réalise la séquence de `SELECT` de garde + INSERT (idempotent) ; les
+ * suivants retournent immédiatement la même Promise (O(1)). Un échec réinitialise
+ * le garde pour permettre une nouvelle tentative. L'idempotence des gardes reste
+ * valable en multi-instances (scale-out) : aucun INSERT si la ligne existe déjà.
+ * Conservé sous le nom historique `ensureAppDefaults` pour ne changer aucun appelant.
+ */
+export async function ensureAppDefaults(): Promise<void> {
+  if (appDefaultsPromise) return appDefaultsPromise;
+  appDefaultsPromise = ensureAppDefaultsUncached().catch((e: unknown) => {
+    appDefaultsPromise = null;
+    throw e;
+  });
+  return appDefaultsPromise;
 }

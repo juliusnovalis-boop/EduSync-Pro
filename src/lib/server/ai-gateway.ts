@@ -1,4 +1,4 @@
-﻿/** Secure, server-only multi-provider AI gateway. */
+/** Secure, server-only multi-provider AI gateway. */
 import { geminiChat, geminiOcrGrades, geminiTranscribe, readSecret, GEMINI_VISION_MODEL, GEMINI_TEXT_MODEL } from "./ai";
 import { aiRouter, AIRouterError } from "./ai-router";
 import {
@@ -7,6 +7,7 @@ import {
   type ModelMetadata,
 } from "./ai-policy";
 import { ollamaChat, OllamaProviderError } from "./providers/ollama-provider";
+import { tokeninChat, TokeninProviderError } from "./providers/tokenin-provider";
 import { checkAndReserve, recordUsage, getLimits, ROLE_QUOTAS, type QuotaContext } from "./ai-quota-manager";
 
 // Réexport pour compatibilité — les symboles partagés proviennent de ai-policy.ts
@@ -100,6 +101,25 @@ async function ollamaChatAdapter(messages: ChatMessages, model: string): Promise
 }
 
 
+
+/**
+ * Adaptateur TOKEN FREE IA (tokenin) — exécuté DANS le pipeline gateway
+ * (quota/cache/audit/FREE-ONLY appliqués automatiquement).
+ * Aucune clé/secrète n'est jamais loggée ni renvoyée.
+ */
+async function tokeninChatAdapter(messages: ChatMessages, model: string): Promise<AiGatewayResponse> {
+  if (!checkModelIsFree("tokenin", model).allowed) throw new AiGatewayError("PAID_OR_UNKNOWN_MODEL", "Le modèle TOKEN FREE IA demandé n'est pas confirmé gratuit.");
+  try {
+    const content = await tokeninChat(messages, model, { temperature: 0.4 });
+    return { content, provider: "tokenin", source: "tokenin", model, cached: false };
+  } catch (err) {
+    if (err instanceof TokeninProviderError) {
+      const mapped: Record<string, "RATE_LIMITED" | "PAID_OR_UNKNOWN_MODEL" | "PROVIDER_ERROR"> = { RATE_LIMITED: "RATE_LIMITED", MODEL_NOT_FOUND: "PAID_OR_UNKNOWN_MODEL" };
+      throw new AiGatewayError(mapped[err.code] ?? "PROVIDER_ERROR", err.message);
+    }
+    throw new AiGatewayError("PROVIDER_ERROR", "Le fournisseur TOKEN FREE IA est temporairement indisponible.");
+  }
+}
 /** OCR adapter -- delegates to geminiOcrGrades (vision). HF stays cost-guarded (UNKNOWN_PRICING). */
 async function geminiOcrAdapter(input: NonNullable<AiGatewayRequest["ocrInput"]>): Promise<AiGatewayResponse> {
   if (!checkModelIsFree("gemini", GEMINI_VISION_MODEL).allowed) throw new AiGatewayError("PAID_OR_UNKNOWN_MODEL", "Le modele Gemini vision n'est pas confirme gratuit.");
@@ -209,6 +229,7 @@ export async function aiGateway(req: AiGatewayRequest): Promise<AiGatewayRespons
         step.provider === "gemini" ? await geminiFreeChat(req.messages!, step.model)
         : step.provider === "openrouter" ? await openRouterChat(req.messages!, step.model)
         : step.provider === "ollama" ? await ollamaChatAdapter(req.messages!, step.model)
+        : step.provider === "tokenin" ? await tokeninChatAdapter(req.messages!, step.model)
         : null;
       if (response) {
         if (scopedKey) responseCache.set(scopedKey, { expiresAt: Date.now() + 300_000, response });
@@ -227,3 +248,4 @@ export async function aiGateway(req: AiGatewayRequest): Promise<AiGatewayRespons
   }
   throw new AiGatewayError("FREE_SERVICE_UNAVAILABLE", "Le service IA gratuit correspondant a cette tache est actuellement indisponible.");
 }
+

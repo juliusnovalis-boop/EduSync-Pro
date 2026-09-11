@@ -111,9 +111,30 @@ export async function ensureDemoSchema(): Promise<void> {
   }
 }
 
-/** Amorce le schéma démo si l'environnement courant est « demo ». */
+/**
+ * Cache mémoire du schéma `demo` : la première requête (env. demo) déclenche le
+ * scan/migration ; les suivantes partagent la même Promise (O(1)). En cas
+ * d'échec, le garde se réinitialise pour permettre une nouvelle tentative.
+ * L'idempotence (`IF NOT EXISTS`) rend ce cache sûr même si plusieurs instances
+ * (scale-out) s'amorcent en parallèle.
+ */
+let demoSchemaPromise: Promise<void> | null = null;
+
+/**
+ * Garantit que le schéma `demo` n'est créé/synchronisé qu'UNE fois par processus.
+ * `demoSchemaPromise` joue le rôle de double-checked lock : pendant le premier
+ * amorçage, toute requête concurrente attend la même opération au lieu d'en
+ * déclencher une nouvelle. Un échec réinitialise le garde (nouvelle tentative) ;
+ * un succès le conserve (le chemin chaud devient un simple retour de Promise).
+ */
 export async function ensureCurrentSchema(): Promise<void> {
-  if (isDemo()) await ensureDemoSchema();
+  if (!isDemo()) return;
+  if (demoSchemaPromise) return demoSchemaPromise;
+  demoSchemaPromise = ensureDemoSchema().catch((e: unknown) => {
+    demoSchemaPromise = null;
+    throw e;
+  });
+  return demoSchemaPromise;
 }
 
 /**

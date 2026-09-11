@@ -57,7 +57,7 @@ export class AIRouterError extends Error {
  * 'ollama' n'est ajouté en candidat QUE si checkModelIsFree() le confirme gratuit ;
  * sans preuve FREE_VERIFIED il est ignoré automatiquement (voir bloc demandé-explicite). */
 const CAPABILITY_PROVIDERS: Record<AiCapability, AiProviderId[]> = {
-  chat: ["gemini", "openrouter", "ollama"],
+  chat: ["gemini", "openrouter", "ollama", "tokenin"],
   ocr: ["gemini"],
   transcribe: ["gemini"],
 };

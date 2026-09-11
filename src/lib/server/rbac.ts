@@ -1,8 +1,8 @@
 /**
- * RBAC EduSync Pro - couche centralisee de roles & permissions.
+ * RBAC EduSync Pro — couche centralisée de rôles & permissions.
  *
- * Roles officiels : SUPER_ADMIN > ADMIN > TEACHER > STUDENT > PARENT (hiérarchie cumulative).
- * Les permissions sont cumulatives (TEACHER herite de STUDENT, ADMIN de TEACHER...).
+ * Rôles officiels : SUPER_ADMIN > ADMIN > TEACHER > STUDENT > PARENT (hiérarchie cumulative).
+ * Les permissions sont cumulatives (TEACHER hérite de STUDENT, ADMIN de TEACHER...).
  * Conçu pour ajouter de nouveaux rôles (DIRECTOR, ACCOUNTANT...) SANS réécrire.
  *
  * La sécurité ne repose JAMAIS sur l'UI : `can()` est la source de vérité,
@@ -63,41 +63,51 @@ export const PERMISSIONS = {
   // Tableau de bord & profil
   DASHBOARD_VIEW: "dashboard.view",
   PROFILE_EDIT: "profile.edit",
+
   // Utilisateurs & comptes
   USERS_READ: "users.read",
   USERS_CREATE: "users.create",
   USERS_UPDATE: "users.update",
   USERS_DELETE: "users.delete",
   USERS_MANAGE_ROLES: "users.manage_roles",
+
   // Classes & élèves
   CLASSES_READ: "classes.read",
   CLASSES_CREATE: "classes.create",
   CLASSES_UPDATE: "classes.update",
   CLASSES_DELETE: "classes.delete",
+
   // Notes & évaluations
   GRADES_READ: "grades.read",
   GRADES_CREATE: "grades.create",
   GRADES_UPDATE: "grades.update",
+
   // Devoirs / documents pédagogiques
   ASSIGNMENTS_MANAGE: "assignments.manage",
   DOCUMENTS_READ: "documents.read",
   DOCUMENTS_MANAGE: "documents.manage",
+
   // Présence
   ATTENDANCE_READ: "attendance.read",
   ATTENDANCE_MANAGE: "attendance.manage",
+
   // Matières
   SUBJECTS_READ: "subjects.read",
   SUBJECTS_MANAGE: "subjects.manage",
+
   // Paiements
   PAYMENTS_READ: "payments.read",
   PAYMENTS_MANAGE: "payments.manage",
+
   // Établissements (multi-tenant)
   SCHOOLS_READ: "schools.read",
   SCHOOLS_MANAGE_OWN: "schools.manage_own",
   SCHOOLS_MANAGE_ALL: "schools.manage_all",
+
   // Communication, annonces, calendrier
   COMMUNICATION_USE: "communication.use",
   ANNOUNCEMENTS_MANAGE: "announcements.manage",
+
   // IA
   AI_USE: "ai.use",
   AI_CONFIGURE: "ai.configure",
@@ -105,33 +115,51 @@ export const PERMISSIONS = {
   AI_ASSISTANT_USE: "ai.assistant_use",
   AI_SUPPORT_PLAN: "ai.support_plan",
   AI_DOCUMENT_GENERATE: "ai.document_generate",
+
   // Documents
   DOCUMENTS_GENERATE: "documents.generate",
+
   // Notifications
   NOTIFICATIONS_READ: "notifications.read",
   NOTIFICATIONS_MANAGE: "notifications.manage",
+
   // Automatisation
   AUTOMATION_MANAGE: "automation.manage",
   AUTOMATION_READ: "automation.read",
+
   // Analytics
   ANALYTICS_VIEW: "analytics.view",
   ANALYTICS_VIEW_ALL: "analytics.view_all",
+
   // Ambassadeurs
   AMBASSADOR_MANAGE: "ambassador.manage",
+
   // Partenaires
   PARTNER_MANAGE: "partner.manage",
+
   // Programme pilote
   PILOT_PROGRAM_MANAGE: "pilot_program.manage",
+
   // Système / Core
   MODULES_MANAGE: "modules.manage",
   PLUGINS_MANAGE: "plugins.manage",
   SYSTEM_CONFIGURE: "system.configure",
   SYSTEM_MANAGE: "system.manage",
+
   // Année académique
   ACADEMIC_YEAR_READ: "academic_year.read",
   ACADEMIC_YEAR_MANAGE: "academic_year.manage",
+
   // Audit
-  AUDIT_READ: "audit.read"
+  AUDIT_READ: "audit.read",
+
+  // EduSync Tools
+  TOOLS_USE: "tools.use",
+  TOOLS_MANAGE: "tools.manage",
+
+  // EduSync Knowledge
+  KNOWLEDGE_READ: "knowledge.read",
+  KNOWLEDGE_MANAGE: "knowledge.manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -173,6 +201,8 @@ const TEACHER_PERMS = new Set<string>([
   PERMISSIONS.ANALYTICS_VIEW,
   PERMISSIONS.NOTIFICATIONS_MANAGE,
   PERMISSIONS.AUTOMATION_READ,
+  PERMISSIONS.TOOLS_USE,
+  PERMISSIONS.KNOWLEDGE_READ,
 ]);
 
 /** Admin d'établissement = enseignant + gestion de son établissement. */
@@ -194,6 +224,8 @@ const ADMIN_PERMS = new Set<string>([
   PERMISSIONS.ANALYTICS_VIEW_ALL,
   PERMISSIONS.NOTIFICATIONS_MANAGE,
   PERMISSIONS.AUTOMATION_MANAGE,
+  PERMISSIONS.TOOLS_MANAGE,
+  PERMISSIONS.KNOWLEDGE_MANAGE,
 ]);
 
 /** Parent = consultation limitée (suivi de l'enfant). */
@@ -295,4 +327,19 @@ export function canAccessSchool(
   if (normalizeRole(actorRole) === ROLES.SUPER_ADMIN) return true;
   if (!actorSchoolId) return false;
   return actorSchoolId === targetSchoolId;
+}
+
+/* ------------------- EduSync Knowledge — helpers ---------------------- */
+
+/** Session minimale attendue (jamais de confiance au frontend : rôle lu côté serveur). */
+type KnowledgeSessionLike = { role?: string | null; user?: { role?: string | null } } | null | undefined;
+
+export function canReadKnowledge(session: KnowledgeSessionLike): boolean {
+  const role = session?.user?.role ?? session?.role ?? null;
+  return can(role, PERMISSIONS.KNOWLEDGE_READ);
+}
+
+export function canManageKnowledge(session: KnowledgeSessionLike): boolean {
+  const role = session?.user?.role ?? session?.role ?? null;
+  return can(role, PERMISSIONS.KNOWLEDGE_MANAGE);
 }

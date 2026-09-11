@@ -12,13 +12,33 @@ import { ROLE_LABELS, type AcademicYear } from "../lib/types";
 import { apiFetch } from "../lib/api";
 
 type AiLength = "standard" | "detaille" | "exhaustif";
-type AiProviderChoice = "auto" | "gemini" | "huggingface" | "local";
+type AiProviderChoice = "auto" | "gemini" | "openrouter" | "huggingface" | "ollama" | "tokenin" | "local";
 
 const LENGTH_OPTIONS: { value: AiLength; label: string; hint: string }[] = [
   { value: "standard", label: "Standard", hint: "~4 000 tokens · rapport concis" },
   { value: "detaille", label: "Détaillé", hint: "~8 000 tokens · rapport approfondi" },
   { value: "exhaustif", label: "Exhaustif", hint: "~16 000 tokens · rapport très long" },
 ];
+
+/** Types du catalogue IA (sous-ensemble de /api/ai/catalog) — aucune clé exposée. */
+type CatalogModel = {
+  provider: string;
+  model: string;
+  available: boolean;
+  freeStatus: "FREE" | "FREE_LIMITED" | "PAID" | "UNKNOWN" | "BLOCKED";
+  pricingStatus: string;
+  capabilities: string[];
+  reason: string;
+};
+type CatalogSection = {
+  provider: string;
+  label: string;
+  configured: boolean;
+  available: boolean;
+  freeStatus: string;
+  summary: string;
+  models: CatalogModel[];
+};
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
   gemini: [
@@ -33,6 +53,13 @@ const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: "moonshotai/Kimi-K3:together", label: "Kimi-K3 (texte + vision)" },
     { value: "Qwen/Qwen3.6-27B:featherless-ai", label: "Qwen 3.6 27B (vision)" },
   ],
+  // Fallbacks statiques — utilisés UNIQUEMENT si le catalogue dynamique
+  // (/api/ai/catalog) n'est pas encore chargé. La source de vérité reste le
+  // catalogue réel côté serveur (FREE ONLY appliqué au modèle).
+  openrouter: [
+    { value: "openrouter/free", label: "openrouter/free" },
+  ],
+  ollama: [],
   local: [],
 };
 
@@ -57,6 +84,12 @@ export default function SettingsPage() {
   const [aiModelCustom, setAiModelCustom] = useState("");
   const [aiLength, setAiLength] = useState<AiLength>("exhaustif");
   const [savingAi, setSavingAi] = useState(false);
+  // Catalogue IA réel (modèles TOKENIN FREE / FREE ONLY) + config persistée brute.
+  const [catalog, setCatalog] = useState<CatalogSection[] | null>(null);
+  const [persistedProvider, setPersistedProvider] = useState<AiProviderChoice>("auto");
+  const [persistedLength, setPersistedLength] = useState<AiLength>("exhaustif");
+  const [persistedModel, setPersistedModel] = useState("");
+  const catalogLoading = catalog === null;
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
@@ -70,18 +103,17 @@ export default function SettingsPage() {
       .then((d: { aiEnabled: boolean; label: string }) => setAiLabel(d.aiEnabled ? d.label : null))
       .catch(() => setAiLabel(null))
       .finally(() => setAiLoading(false));
+    // Catalogue IA réel (modèles TOKENIN FREE via AIProviderCatalog, dynamique).
+    apiFetch("/api/ai/catalog", { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { providers?: CatalogSection[] } | null) => setCatalog(d?.providers ?? null))
+      .catch(() => setCatalog(null));
     apiFetch("/api/settings")
       .then((r) => r.json())
       .then((d: { provider: AiProviderChoice; model: string; length: AiLength }) => {
-        setAiProvider(d.provider ?? "auto");
-        setAiLength(d.length ?? "exhaustif");
-        const known = MODEL_OPTIONS[resolveProvider(d.provider ?? "auto")] ?? [];
-        if (d.model && known.some((m) => m.value === d.model)) {
-          setAiModel(d.model);
-        } else if (d.model) {
-          setAiModel("__custom__");
-          setAiModelCustom(d.model);
-        }
+        setPersistedProvider(d.provider ?? "auto");
+        setPersistedLength(d.length ?? "exhaustif");
+        setPersistedModel(d.model ?? "");
       })
       .catch(() => {});
     authedFetch("/api/academic-years")
@@ -96,6 +128,45 @@ export default function SettingsPage() {
     if (p === "auto") return aiLabel ? (aiLabel.includes("Gemini") ? "gemini" : "huggingface") : "local";
     return p;
   }
+/**
+   * Options de modèles du sélecteur.
+   * - TOKEN FREE IA : liste DYNAMIQUE réelle issue de /api/ai/catalog, restreinte
+   *   aux modèles gratuits confirmés (freeStatus === "FREE") — jamais codée en dur,
+   *   jamais payante sous FREE ONLY. IDs TOKENIN conservés à l'identique.
+   * - Autres providers : liste statique historique (comportement inchangé).
+   */
+  function modelOptionsFor(p: string): { value: string; label: string }[] {
+    // Fournisseurs "catalogue" : modèles DYNAMIQUES réels issus de /api/ai/catalog.
+    // Sous FREE ONLY, on ne propose que les modèles confirmés gratuits disponibles.
+    if (p === "tokenin" || p === "openrouter" || p === "ollama") {
+      const section = catalog?.find((x) => x.provider === p);
+      if (section && section.models.length > 0) {
+        return section.models
+          .filter((m) => m.available && (m.freeStatus === "FREE" || m.freeStatus === "FREE_LIMITED"))
+          .map((m) => ({ value: m.model, label: m.model }));
+      }
+      // Fallback statique sûr si le catalogue n'est pas (encore) chargé.
+      return MODEL_OPTIONS[p] ?? [];
+    }
+    return MODEL_OPTIONS[p] ?? [];
+  }
+
+  // Applique la configuration persistée (provider/modèle/longueur) dès que le
+  // catalogue est disponible, afin qu'un modèle TOKENIN restaure correctement
+  // sa sélection après rechargement.
+  useEffect(() => {
+    setAiProvider(persistedProvider);
+    setAiLength(persistedLength);
+    const known = modelOptionsFor(resolveProvider(persistedProvider));
+    if (persistedModel && known.some((m) => m.value === persistedModel)) {
+      setAiModel(persistedModel);
+      setAiModelCustom("");
+    } else if (persistedModel) {
+      setAiModel("__custom__");
+      setAiModelCustom(persistedModel);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistedProvider, persistedLength, catalog]);
 
   async function saveAiConfig() {
     setSavingAi(true);
@@ -254,7 +325,7 @@ export default function SettingsPage() {
         <dl className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl bg-muted p-4">
             <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Version</dt>
-            <dd className="mt-1 font-bold">2.0.0 · fullstack</dd>
+            <dd className="mt-1 font-bold">1.0.0</dd>
           </div>
           <div className="rounded-xl bg-muted p-4">
             <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Stack</dt>
@@ -262,7 +333,7 @@ export default function SettingsPage() {
           </div>
           <div className="rounded-xl bg-muted p-4">
             <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Année scolaire</dt>
-            <dd className="mt-1 font-bold">2025 — 2026</dd>
+            <dd className="mt-1 font-bold">2026 — 2027</dd>
           </div>
           <div className="rounded-xl bg-muted p-4">
             <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Établissement actif</dt>
@@ -287,28 +358,41 @@ export default function SettingsPage() {
             <div className="rounded-xl border border-border bg-muted/40 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Diagnostic des clés API</p>
               <div className="mt-3 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Google Gemini — <code className="text-xs text-muted-foreground">GEMINI_API_KEY / API_KEY</code></span>
-                  {aiLabel?.includes("Gemini") ? (
-                    <Pill tone="success">✓ Configuré</Pill>
-                  ) : (
-                    <Pill tone="muted">Absent</Pill>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span>Hugging Face — <code className="text-xs text-muted-foreground">HF_TOKEN (optionnel)</code></span>
-                  {aiLabel?.includes("Hugging") ? (
-                    <Pill tone="success">✓ Configuré</Pill>
-                  ) : (
-                    <Pill tone="muted">Non requis</Pill>
-                  )}
-                </div>
+                {[
+                  { id: "gemini", label: "Google Gemini", key: "GEMINI_API_KEY" },
+                  { id: "openrouter", label: "OpenRouter", key: "OPENROUTER_API_KEY" },
+                  { id: "huggingface", label: "Hugging Face", key: "HF_TOKEN" },
+                  { id: "ollama", label: "Ollama", key: "OLLAMA_API_KEY" },
+                  { id: "tokenin", label: "TOKEN FREE IA", key: "TOKEN_API_KEY" },
+                ].map((p) => {
+                  const section = catalog?.find((x) => x.provider === p.id);
+                  const configured = section?.configured ?? false;
+                  const hasFree = (section?.models ?? []).some((m) => m.freeStatus === "FREE" || m.freeStatus === "FREE_LIMITED");
+                  // Statut affiché sans jamais exposer la valeur de la clé.
+                  let pill: { tone: "success" | "warning" | "muted" | "danger"; text: string };
+                  if (!configured) {
+                    pill = { tone: "muted", text: "Absent" };
+                  } else if (p.id === "tokenin") {
+                    pill = hasFree
+                      ? { tone: "success", text: "Configuré · Free autorisé" }
+                      : { tone: "warning", text: "Aucun modèle gratuit détecté" };
+                  } else if (p.id === "huggingface") {
+                    pill = hasFree ? { tone: "success", text: "Configuré" } : { tone: "muted", text: "Non requis" };
+                  } else if (p.id === "ollama") {
+                    pill = hasFree
+                      ? { tone: "success", text: "Configuré · Free autorisé" }
+                      : { tone: "warning", text: "Aucun modèle gratuit vérifié" };
+                  } else {
+                    pill = { tone: "success", text: "Configuré" };
+                  }
+                  return (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span>{p.label} — <code className="text-xs text-muted-foreground">{p.key}</code></span>
+                      <Pill tone={pill.tone}>{pill.text}</Pill>
+                    </div>
+                  );
+                })}
               </div>
-              {aiLabel?.includes("Gemini") && (
-                <p className="mt-3 rounded-lg bg-success/10 p-3 text-xs text-success">
-                  ✓ Gemini pilote l'analyse IA, l'OCR des copies et la dictée vocale.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -318,8 +402,11 @@ export default function SettingsPage() {
                 <SelectContent>
                   <SelectItem value="auto">Automatique (recommandé)</SelectItem>
                   <SelectItem value="gemini">Google Gemini</SelectItem>
+                  <SelectItem value="openrouter">OpenRouter</SelectItem>
                   <SelectItem value="huggingface">Hugging Face</SelectItem>
+                  <SelectItem value="ollama">Ollama</SelectItem>
                   <SelectItem value="local">Local (hors ligne)</SelectItem>
+                  <SelectItem value="tokenin">TOKEN FREE IA</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">« Automatique » utilise la meilleure clé disponible (Gemini → Hugging Face → local).</p>
@@ -331,7 +418,7 @@ export default function SettingsPage() {
                 <Select value={aiModel} onValueChange={setAiModel}>
                   <SelectTrigger><SelectValue placeholder="Modèle par défaut du fournisseur" /></SelectTrigger>
                   <SelectContent>
-                    {(MODEL_OPTIONS[resolveProvider(aiProvider)] ?? []).map((m) => (
+                    {(modelOptionsFor(resolveProvider(aiProvider)) ?? []).map((m) => (
                       <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                     ))}
                     <SelectItem value="__custom__">Modèle personnalisé…</SelectItem>

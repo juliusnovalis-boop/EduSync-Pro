@@ -1,5 +1,9 @@
 export type Student = {
   id: string;
+  user_id?: string | null; // lien profil ↔ compte app_users (réforme des comptes)
+  login_id?: string | null; // login app_users (jointure réelle, jamais calculé)
+  account_status?: string | null; // statut du compte app_users associé (jointure)
+  account_exists?: boolean | null;
   first_name: string;
   last_name: string;
   gender: string;
@@ -17,6 +21,7 @@ export type Student = {
 
 export type Teacher = {
   id: string;
+  user_id?: string | null; // lien profil ↔ compte app_users (réforme des comptes)
   first_name: string;
   last_name: string;
   gender: string;
@@ -298,6 +303,10 @@ export const PERM = {
   ACADEMIC_YEAR_READ: "academic_year.read",
   ACADEMIC_YEAR_MANAGE: "academic_year.manage",
   AUDIT_READ: "audit.read",
+  TOOLS_USE: "tools.use",
+  TOOLS_MANAGE: "tools.manage",
+  KNOWLEDGE_READ: "knowledge.read",
+  KNOWLEDGE_MANAGE: "knowledge.manage",
 } as const;
 
 export type UserRole = {

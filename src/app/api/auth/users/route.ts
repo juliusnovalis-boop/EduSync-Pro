@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { appUsers, establishments } from "@/db/schema";
-import { requirePermission, sha256, genLoginId, genPassword, newUserId, revokeUserSessions } from "@/lib/server/auth";
+import { appUsers, establishments, students, teachers } from "@/db/schema";
+import { requirePermission, sha256, genLoginId, genPassword, newUserId, createStudentFiche, createTeacherFiche, revokeUserSessions } from "@/lib/server/auth";
 import { PERMISSIONS, ROLES, CREATABLE_ROLES, normalizeRole, normalizeStatus, roleRank } from "@/lib/server/rbac";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
+
+/** Scinde « Prénom NOM » → { first_name, last_name } (le prénom = le 1er mot). */
+function splitFullName(fullName: string): { first_name: string; last_name: string } {
+  const trimmed = String(fullName).trim();
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return { first_name: trimmed, last_name: "" };
+  return { first_name: parts[0], last_name: parts.slice(1).join(" ") };
+}
+
+// sql importé pour d'éventuelles requêtes scopées futures (multi-tenant étendu).
+void sql;
 
 type PublicUser = {
   id: string;
@@ -111,11 +122,12 @@ export async function POST(req: NextRequest) {
       loginId = genLoginId();
     }
 
-    const password = genPassword();
+        const password = genPassword();
     const now = new Date().toISOString();
     const isSuper = actor.role === ROLES.SUPER_ADMIN;
+    const userId = newUserId(); // UUID interne (distinct du login_id public EDU-XXXXXXXX)
     const row = {
-      id: newUserId(), // UUID interne (distinct du login_id public EDU-XXXXXXXX)
+      id: userId,
       login_id: loginId, // EDU-XXXXXXXX, unicité vérifiée ci-dessus
       password_hash: sha256(password), // jamais de mot de passe en clair
       full_name: String(full_name).trim(),
@@ -127,16 +139,60 @@ export async function POST(req: NextRequest) {
       created_at: now,
       updated_at: now,
     };
-    const [created] = await db.insert(appUsers).values(row).returning();
 
+    // Réforme des comptes : un compte métier (STUDENT / TEACHER) crée impérativement sa
+    // fiche métier liée DANS LA MÊME TRANSACTION que le compte app_users. En cas d'erreur,
+    // rollback total → jamais de compte orpheline sans profil lié.
+    await db.transaction(async (tx) => {
+      await tx.insert(appUsers).values(row);
+
+      if (finalRole === ROLES.STUDENT) {
+        const nm = splitFullName(String(full_name));
+        await createStudentFiche(tx, {
+          first_name: nm.first_name,
+          last_name: nm.last_name,
+          parent_email: email ?? null,
+          user_id: userId,
+          school_year: "",
+          created_at: now,
+        });
+      } else if (finalRole === ROLES.TEACHER) {
+        const nm = splitFullName(String(full_name));
+        await createTeacherFiche(tx, {
+          first_name: nm.first_name,
+          last_name: nm.last_name,
+          email: email ?? null,
+          user_id: userId,
+          created_at: now,
+        });
+      }
+    });
+
+    // L'audit est journalisé APRÈS la transaction validée (hors rollback).
     await logAudit({
       actor_id: actor.userId,
       actor_role: actor.role,
       action: finalRole === ROLES.ADMIN ? AUDIT_ACTIONS.ADMIN_CREATED : AUDIT_ACTIONS.USER_CREATED,
-      target_id: created.id,
+      target_id: userId,
       metadata: { role: finalRole, login_id: loginId, school_id: row.school_id },
     });
+    if (finalRole === ROLES.STUDENT) {
+      await logAudit({
+        actor_id: actor.userId, actor_role: actor.role,
+        action: AUDIT_ACTIONS.STUDENT_PROFILE_CREATED,
+        target_id: userId,
+        metadata: { login_id: loginId },
+      });
+    } else if (finalRole === ROLES.TEACHER) {
+      await logAudit({
+        actor_id: actor.userId, actor_role: actor.role,
+        action: AUDIT_ACTIONS.TEACHER_PROFILE_CREATED,
+        target_id: userId,
+        metadata: { login_id: loginId },
+      });
+    }
 
+    const created: typeof appUsers.$inferSelect = { ...row, must_change_password: false, last_login_at: null } as typeof appUsers.$inferSelect;
     return NextResponse.json({ user: publicRow(created), credentials: { id: loginId, password } }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });

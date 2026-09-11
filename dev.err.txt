@@ -1,0 +1,5 @@
+⚠ Warning: Next.js ignored package-lock.json in C:\Users\LENOVO because it is outside the current Git repository (C:\Users\LENOVO\Downloads\agon-agent_2-f2762693\EduSync Pro).
+ To use this directory, set `turbopack.root` in your Next.js config.
+
+(node:13676) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

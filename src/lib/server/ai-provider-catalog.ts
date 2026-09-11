@@ -16,6 +16,7 @@
 import { readSecret } from "./ai";
 import { resolveFreeModels, PROVIDER_PRIORITY, type AiProviderId } from "./ai-policy";
 import { ollamaPlan, fetchOllamaAccountModels } from "./ollama-catalog";
+import { isTokeninConfigured, tokeninListModels, tokeninCatalogSource } from "./providers/tokenin-provider";
 
 export type AiFreeStatus = "FREE" | "FREE_LIMITED" | "PAID" | "UNKNOWN" | "BLOCKED";
 
@@ -54,6 +55,7 @@ const LABELS: Record<AiProviderId, string> = {
   openrouter: "OpenRouter",
   ollama: "Ollama Cloud",
   huggingface: "Hugging Face",
+  tokenin: "TOKEN FREE IA",
 };
 
 /** Modèles du niveau gratuit Gemini (politique existante). */
@@ -67,7 +69,9 @@ function isConfigured(provider: AiProviderId): boolean {
     case "gemini": return Boolean(readSecret(["GEMINI_API_KEY"]));
     case "openrouter": return Boolean(readSecret(["OPENROUTER_API_KEY"]));
     case "ollama": return Boolean(readSecret(["OLLAMA_API_KEY"]));
-    default: return Boolean(readSecret(["HF_TOKEN"]));
+    case "huggingface": return Boolean(readSecret(["HF_TOKEN"]));
+    case "tokenin": return Boolean(readSecret(["TOKEN_API_KEY"]));
+    default: return false;
   }
 }
 
@@ -152,6 +156,59 @@ async function ollamaSection(): Promise<ProviderCatalogSection> {
   };
 }
 
+async function tokeninSection(): Promise<ProviderCatalogSection> {
+  const configured = isConfigured("tokenin");
+  if (!configured) {
+    return {
+      provider: "tokenin", label: LABELS.tokenin, configured: false, available: false,
+      freeStatus: "BLOCKED" as AiFreeStatus,
+      summary: "🔴 Non configuré",
+      models: [],
+    };
+  }
+  // Découverte dynamique du catalogue TOKENIN (métadonnées réelles de gratuité).
+  let catalog: { id: string; capabilities: string[]; freeStatus: string }[] = [];
+  let source: "api" | "fallback" = "fallback";
+  try {
+    const list = await tokeninListModels();
+    source = tokeninCatalogSource();
+    catalog = list.map((m) => ({ id: m.id, capabilities: m.capabilities, freeStatus: m.freeStatus }));
+  } catch {
+    // Catalogue distant indisponible -> section présentée comme indisponible.
+  }
+  const hasCatalog = catalog.length > 0;
+  const freeCount = catalog.filter((m) => m.freeStatus === "FREE").length;
+  const summary = !hasCatalog
+    ? "🟡 Catalogue indisponible"
+    : source === "fallback"
+      ? `🟡 Catalogue indisponible · ${freeCount} gratuit(s) (secours)`
+      : `🟢 ${freeCount} gratuit(s) · ${catalog.length} total`;
+  return {
+    provider: "tokenin", label: LABELS.tokenin, configured, available: hasCatalog,
+    freeStatus: configurableFreeStatus(freeCount, hasCatalog) as AiFreeStatus,
+    summary,
+    // Un modèle n'est jamais déclaré gratuit sans preuve (métadonnées réelles).
+    models: catalog.map((m) => ({
+      provider: "tokenin" as AiProviderId, model: m.id, available: hasCatalog,
+      freeStatus: (m.freeStatus === "FREE" ? "FREE" : m.freeStatus === "PAID" ? "PAID" : "UNKNOWN") as AiFreeStatus,
+      pricingStatus: m.freeStatus === "FREE" ? "FREE" : m.freeStatus === "PAID" ? "PAID" : "UNKNOWN",
+      capabilities: m.capabilities,
+      reason: m.freeStatus === "FREE"
+        ? "Modèle gratuit confirmé (tarif input/output=0)"
+        : m.freeStatus === "PAID"
+          ? "Modèle payant — refusé par FREE ONLY"
+          : "Gratuité inconnue — à vérifier",
+    })),
+  };
+}
+
+/** Statut agrégé d'une section selon la présence de modèles gratuits confirmés. */
+function configurableFreeStatus(freeCount: number, hasModels: boolean): "FREE" | "FREE_LIMITED" | "BLOCKED" | "UNKNOWN" {
+  if (!hasModels) return "UNKNOWN";
+  if (freeCount > 0) return "FREE";
+  return "BLOCKED";
+}
+
 async function hfSection(): Promise<ProviderCatalogSection> {
   const configured = isConfigured("huggingface");
   const credit = hfFreeCreditState();
@@ -182,10 +239,9 @@ async function hfSection(): Promise<ProviderCatalogSection> {
 
 export async function getAiProviderCatalog(forceRefresh = false): Promise<AiProviderCatalogReport> {
   if (!forceRefresh && catalogCache && Date.now() - catalogCache.at < CATALOG_TTL_MS) return catalogCache.report;
-  const [gemini, openrouter, ollama, huggingface] = await Promise.all([
-    geminiSection(), openRouterSection(), ollamaSection(), hfSection(),
+  const [gemini, openrouter, ollama, huggingface, tokenin] = await Promise.all([    geminiSection(), openRouterSection(), ollamaSection(), hfSection(), tokeninSection(),
   ]);
-  const byId: Record<AiProviderId, ProviderCatalogSection> = { gemini, openrouter, ollama, huggingface };
+  const byId: Record<AiProviderId, ProviderCatalogSection> = { gemini, openrouter, ollama, huggingface, tokenin };
   const report: AiProviderCatalogReport = {
     checkedAt: new Date().toISOString(),
     providers: PROVIDER_PRIORITY.map((id) => byId[id]),

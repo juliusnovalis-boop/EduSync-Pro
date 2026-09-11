@@ -73,6 +73,7 @@ export const teachers = pgTable("teachers", {
   gender: text("gender"),
   email: text("email"),
   phone: text("phone"),
+  user_id: text("user_id"), // lien profil ↔ compte app_users (réforme : un compte TEACHER = au plus une fiche)
   subject_names: text("subject_names").array(),
   hire_date: text("hire_date"),
   status: text("status"),
@@ -87,6 +88,7 @@ export const students = pgTable("students", {
   birth_date: text("birth_date"),
   matricule: text("matricule"),
   class_id: text("class_id"),
+  user_id: text("user_id"), // lien profil ↔ compte app_users (réforme : un compte STUDENT = au plus une fiche)
   parent_name: text("parent_name"),
   parent_phone: text("parent_phone"),
   parent_email: text("parent_email"),
@@ -95,6 +97,36 @@ export const students = pgTable("students", {
   status: text("status"),
   created_at: text("created_at"),
 });
+
+/* ====================================================================== *
+ *  MODULE — ENSEIGNANTS : affectations multi-établissements / multi-classes
+ *  Tables existantes en base (migration 0001). Source de vérité des
+ *  affectations. Un enseignant peut être affecté à plusieurs établissements,
+ *  plusieurs classes et plusieurs matières.
+ * ====================================================================== */
+export const teacherEstablishmentAssignments = pgTable(
+  "teacher_establishment_assignments",
+  {
+    id: text("id").primaryKey(),
+    teacher_id: text("teacher_id").notNull(),
+    establishment_id: text("establishment_id").notNull(),
+    status: text("status"),
+    created_at: text("created_at"),
+  },
+);
+
+export const teacherClassAssignments = pgTable(
+  "teacher_class_assignments",
+  {
+    id: text("id").primaryKey(),
+    teacher_id: text("teacher_id").notNull(),
+    class_id: text("class_id").notNull(),
+    subject_id: text("subject_id"),
+    school_year: text("school_year"),
+    status: text("status"),
+    created_at: text("created_at"),
+  },
+);
 
 export const grades = pgTable("grades", {
   id: text("id").primaryKey(),
@@ -559,3 +591,66 @@ export const aiUsageLogs = pgTable("ai_usage_logs", {
   index("ai_usage_logs_user_idx").on(table.environment, table.school_id, table.user_id, table.created_at),
   index("ai_usage_logs_school_idx").on(table.environment, table.school_id, table.created_at),
 ]);
+/* ---------------------- EduSync Knowledge ----------------------------- */
+
+/** Ressources de la bibliothèque (établissement + références). Propriétés camelCase. */
+export const knowledgeResources = pgTable(
+  "knowledge_resources",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    subtitle: text("subtitle"),
+    authors: text("authors"),
+    isbn: text("isbn"),
+    publisher: text("publisher"),
+    publicationYear: integer("publication_year"),
+    edition: text("edition"),
+    subject: text("subject"),
+    level: text("level"),
+    classLevel: text("class_level"),
+    language: text("language"),
+    country: text("country"),
+    educationSystem: text("education_system"),
+    curriculum: text("curriculum"),
+    description: text("description"),
+    coverUrl: text("cover_url"),
+    resourceType: text("resource_type"),
+    sourceType: text("source_type"),
+    sourceName: text("source_name"),
+    sourceUrl: text("source_url"),
+    externalId: text("external_id"),
+    accessMode: text("access_mode"),
+    rightsStatus: text("rights_status"),
+    license: text("license"),
+    fileUrl: text("file_url"),
+    scope: text("scope"),
+    schoolId: text("school_id"),
+    createdBy: text("created_by"),
+    createdAt: text("created_at"),
+    updatedAt: text("updated_at"),
+    lastVerifiedAt: text("last_verified_at"),
+    status: text("status"),
+  },
+  (table) => [
+    index("knowledge_resources_school_idx").on(table.schoolId),
+    index("knowledge_resources_subject_idx").on(table.subject),
+    index("knowledge_resources_level_idx").on(table.level),
+    index("knowledge_resources_rights_idx").on(table.rightsStatus),
+    index("knowledge_resources_access_idx").on(table.accessMode),
+    index("knowledge_resources_status_idx").on(table.status),
+  ],
+);
+
+/** Historique de consultation Knowledge (ouverure, lecture, téléchargement, source externe). */
+export const knowledgeHistory = pgTable(
+  "knowledge_history",
+  {
+    id: text("id").primaryKey(),
+    user_id: text("user_id").notNull(),
+    resource_id: text("resource_id").notNull(),
+    school_id: text("school_id"),
+    action: text("action"),
+    created_at: text("created_at"),
+  },
+  (table) => [index("knowledge_history_user_idx").on(table.user_id, table.created_at)],
+);

@@ -105,13 +105,17 @@ export default function AiHealthCard() {
                 <span className="text-muted-foreground">{p.label}</span>
                 <span className="font-semibold">
                   {STATUS_ICON[p.status] ?? ""}{" "}
-                  {p.status === "ready"
+                                    {p.status === "ready"
                     ? "Configuré / Free autorisé"
                     : p.reason === "FREE_POLICY_BLOCKED"
-                      ? "Bloqué par FREE ONLY"
-                      : p.reason === "NO_API_KEY"
-                        ? "Non configuré"
-                        : p.status}
+                      ? "Modèle payant refusé"
+                      : p.reason === "NO_FREE_MODEL"
+                        ? "Aucun modèle gratuit détecté"
+                        : p.reason === "TOKEN_FREE_UNAVAILABLE"
+                          ? "Catalogue indisponible"
+                          : p.reason === "NO_API_KEY"
+                            ? "Non configuré"
+                            : p.status}
                 </span>
               </div>
             ))}

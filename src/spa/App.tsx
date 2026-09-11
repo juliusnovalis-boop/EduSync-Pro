@@ -33,6 +33,8 @@ import CalendarPage from "./pages/CalendarPage";
 import EstablishmentsPage from "./pages/EstablishmentsPage";
 import AccessPage from "./pages/AccessPage";
 import SettingsPage from "./pages/SettingsPage";
+import ToolsPage from "./pages/ToolsPage";
+import KnowledgePage from "./pages/KnowledgePage";
 
 export default function App() {
   return (
@@ -71,6 +73,8 @@ export default function App() {
               <Route path="/establishments" element={<EstablishmentsPage />} />
               <Route path="/access" element={<AccessPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/tools" element={<ToolsPage />} />
+              <Route path="/knowledge" element={<KnowledgePage />} />
             </Route>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -64,6 +64,7 @@ export function CrudPage<T extends { id: string }>({
   ascending = false,
   toolbar,
   header,
+  createBlocked,
 }: {
   table: TableName;
   title: string;
@@ -77,6 +78,8 @@ export function CrudPage<T extends { id: string }>({
   ascending?: boolean;
   toolbar?: ReactNode;
   header?: (rows: T[]) => ReactNode;
+  /** Réforme des comptes : masque la création directe (profil métier = création via Gestion des accès). */
+  createBlocked?: string;
 }) {
   const { data, isLoading } = useRows<T>(table, { order, ascending });
   const save = useSaveRow(table, singular);
@@ -137,9 +140,13 @@ export function CrudPage<T extends { id: string }>({
         title={title}
         subtitle={subtitle}
         action={
-          <Button onClick={openCreate} className="rounded-full">
-            <Plus className="mr-1 size-4" /> Nouveau
-          </Button>
+          createBlocked ? (
+            <span className="text-xs text-muted-foreground">{createBlocked}</span>
+          ) : (
+            <Button onClick={openCreate} className="rounded-full">
+              <Plus className="mr-1 size-4" /> Nouveau
+            </Button>
+          )
         }
       />
 

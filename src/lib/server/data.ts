@@ -9,6 +9,7 @@ import {
   subjects,
   teachers,
   students,
+  appUsers,
   grades,
   attendance,
   payments,
@@ -22,7 +23,9 @@ import {
   attendanceSessions,
   attendanceQrRecords,
   qrScanHistory,
-  parentStudentLinks,
+    parentStudentLinks,
+  teacherEstablishmentAssignments,
+  teacherClassAssignments,
   notifications,
   aiConversations,
   aiConversationMessages,
@@ -51,8 +54,8 @@ export const TABLES: Record<string, string[]> = {
   user_roles: ["id", "user_id", "role", "created_at"],
   classes: ["id", "name", "level", "school_year", "capacity", "room", "main_teacher_id", "created_at"],
   subjects: ["id", "name", "code", "coefficient", "level", "color", "created_at"],
-  teachers: ["id", "first_name", "last_name", "gender", "email", "phone", "subject_names", "hire_date", "status", "created_at"],
-  students: ["id", "first_name", "last_name", "gender", "birth_date", "matricule", "class_id", "parent_name", "parent_phone", "parent_email", "address", "school_year", "status", "created_at"],
+    teachers: ["id", "first_name", "last_name", "gender", "email", "phone", "user_id", "subject_names", "hire_date", "status", "created_at"],
+  students: ["id", "first_name", "last_name", "gender", "birth_date", "matricule", "class_id", "user_id", "parent_name", "parent_phone", "parent_email", "address", "school_year", "status", "created_at"],
   grades: ["id", "student_id", "subject_id", "class_id", "type", "value", "max_value", "term", "school_year", "date", "appreciation", "created_at"],
   attendance: ["id", "student_id", "class_id", "date", "status", "reason", "created_at"],
   payments: ["id", "student_id", "amount", "type", "method", "date", "month", "status", "reference", "note", "created_at"],
@@ -66,7 +69,9 @@ export const TABLES: Record<string, string[]> = {
   attendance_sessions: ["id", "class_id", "teacher_name", "date", "qr_token", "status", "created_at"],
   attendance_qr_records: ["id", "session_id", "student_id", "scanned_at", "status", "created_at"],
   qr_scan_history: ["id", "token", "type", "result", "created_at"],
-  parent_student_links: ["id", "parent_user_id", "student_id", "created_at"],
+    parent_student_links: ["id", "parent_user_id", "student_id", "created_at"],
+  teacher_establishment_assignments: ["id", "teacher_id", "establishment_id", "status", "created_at"],
+  teacher_class_assignments: ["id", "teacher_id", "class_id", "subject_id", "school_year", "status", "created_at"],
   notifications: ["id", "user_id", "category", "title", "body", "priority", "read", "action_url", "related_id", "related_type", "created_at"],
   ai_conversations: ["id", "user_id", "role", "assistant_type", "model", "provider", "title", "created_at", "updated_at"],
   ai_conversation_messages: ["id", "conversation_id", "role", "content", "created_at"],
@@ -104,6 +109,7 @@ const REGISTRY = {
   subjects,
   teachers,
   students,
+  appUsers,
   grades,
   attendance,
   payments,
@@ -117,7 +123,9 @@ const REGISTRY = {
   attendance_sessions: attendanceSessions,
   attendance_qr_records: attendanceQrRecords,
   qr_scan_history: qrScanHistory,
-  parent_student_links: parentStudentLinks,
+    parent_student_links: parentStudentLinks,
+  teacher_establishment_assignments: teacherEstablishmentAssignments,
+  teacher_class_assignments: teacherClassAssignments,
   notifications,
   ai_conversations: aiConversations,
   ai_conversation_messages: aiConversationMessages,
@@ -200,6 +208,96 @@ export async function listRows(table: TableName, options: Options = {}) {
   return coerceOnRead(table, rows);
 }
 
+/**
+ * Périmètre de lecture par rôle (modèle multi-établissements).
+ * - TEACHER : uniquement les élèves/classes de SES affectations
+ *   (teacher_class_assignments) — jamais toutes les classes de l'établissement.
+ * - PARENT : uniquement SES enfants (parent_student_links), quel que soit
+ *   l'établissement de l'enfant (parent multi-écoles autorisé).
+ * - STUDENT : uniquement sa propre fiche et ses propres données.
+ * - ADMIN / SUPER_ADMIN : pas de filtrage supplémentaire (RBAC existant).
+ * Le schoolId de session reste le contexte actif ; il n'est PAS utilisé pour
+ * couper la relation parent multi-écoles.
+ */
+export async function scopeRowsForActor(
+  table: TableName,
+  rows: Record<string, unknown>[],
+  actor: { role: string; userId: string } | null,
+): Promise<Record<string, unknown>[]> {
+  if (!actor) return rows;
+  if (actor.role === "SUPER_ADMIN" || actor.role === "ADMIN") return rows;
+
+  if (actor.role === "TEACHER") {
+    if (table !== "students" && table !== "classes") return rows;
+    const prof = (await db.select().from(teachers as never).where(eq(teachers.user_id, actor.userId)).limit(1)) as unknown as { id: string }[];
+    if (!prof.length) return [];
+    const ca = (await db
+      .select()
+      .from(teacherClassAssignments as never)
+      .where(eq(teacherClassAssignments.teacher_id, prof[0].id))) as unknown as { class_id: string | null }[];
+    const classIds = new Set(ca.map((a) => a.class_id).filter(Boolean).map(String));
+    if (table === "classes") return rows.filter((r) => classIds.has(String(r.id)));
+    return rows.filter((r) => classIds.has(String(r.class_id)));
+  }
+
+  if (actor.role === "PARENT") {
+    if (!["students", "grades", "attendance", "payments"].includes(table)) return rows;
+    const links = (await db
+      .select()
+      .from(parentStudentLinks as never)
+      .where(eq(parentStudentLinks.parent_user_id, actor.userId))) as unknown as { student_id: string }[];
+    const ids = new Set(links.map((l) => l.student_id));
+    if (table === "students") return rows.filter((r) => ids.has(String(r.id)));
+    return rows.filter((r) => ids.has(String(r.student_id)));
+  }
+
+  if (actor.role === "STUDENT") {
+    if (table === "students") return rows.filter((r) => r.user_id === actor.userId);
+    if (["grades", "attendance", "payments"].includes(table)) {
+      const me = (await db.select().from(students as never).where(eq(students.user_id, actor.userId)).limit(1)) as unknown as { id: string }[];
+      if (!me.length) return [];
+      return rows.filter((r) => String(r.student_id) === me[0].id);
+    }
+    return rows;
+  }
+
+  return rows;
+}
+/**
+ * Enrichit les fiches métier (students / teachers) avec les données du compte
+ * app_users associé : login_id, statut du compte, email.
+ * La liaison est la relation réelle user_id -> app_users.id (jamais le nom).
+ * Si user_id est NULL, la fiche est laissée inchangée (pas de compte inventé).
+ */
+export async function attachAccountInfo(
+  table: TableName,
+  rows: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  if (table !== "students" && table !== "teachers") return rows;
+  const ids = rows
+    .map((r) => r.user_id)
+    .filter((v): v is string => !!v && typeof v === "string");
+  if (!ids.length) return rows;
+  const uniq = [...new Set(ids)];
+  const accts = (await db
+    .select({
+      id: appUsers.id,
+      login_id: appUsers.login_id,
+      status: appUsers.status,
+      email: appUsers.email,
+    })
+    .from(appUsers)
+    .where(sql`${appUsers.id} IN (${sql.join(uniq.map((u) => sql`${u}`), sql`, `)})`)) as unknown as {
+    id: string; login_id: string | null; status: string | null; email: string | null;
+  }[];
+  const byId = new Map(accts.map((a) => [a.id, a]));
+  return rows.map((r) => {
+    if (!r.user_id) return r;
+    const a = byId.get(String(r.user_id));
+    if (!a) return { ...r, account_exists: false, login_id: null, account_status: null };
+    return { ...r, account_exists: true, login_id: a.login_id, account_status: a.status, account_email: a.email };
+  });
+}
 export async function createRow(table: TableName, values: Record<string, unknown>) {
   const t = REGISTRY[table];
   const payload = { ...cleanValues(table, values), id: newId(), created_at: new Date().toISOString() };

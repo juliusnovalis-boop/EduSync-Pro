@@ -89,10 +89,9 @@ export default function AuthPage() {
             Élèves, enseignants, notes, présences, bulletins, paiements et analyses — une plateforme unique pour piloter
             votre établissement au quotidien.
           </p>
-          <p className="mt-6 text-xs opacity-60">Fullstack · React + PostgreSQL · IA intégrée</p>
         </div>
         <p className="text-xs opacity-70">
-          {demo ? "Environnement de démonstration — données isolées · " : ""}Année scolaire 2025 — 2026 · v2.0
+          {demo ? "Environnement de démonstration — données isolées · " : ""}Année scolaire 2026 — 2027   ·   v1.0.0
         </p>
       </div>
 

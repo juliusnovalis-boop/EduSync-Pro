@@ -1,11 +1,16 @@
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { NextRequest, NextResponse } from "next/server";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { db } from "@/db";
-import { appSettings, appUsers, sessions } from "@/db/schema";
+import * as schema from "@/db/schema";
+import { appSettings, appUsers, sessions, students, teachers } from "@/db/schema";
 import { can, normalizeRole, normalizeStatus, isLoginAllowed, permissionsForRole } from "./rbac";
 import { bindEnvironment, detectEnvironment, getActiveEnvironment, type AppEnvironment } from "./environment";
 import { hmacSecret, newSessionId, sessionDurationMs } from "./security-config";
+
+type DbLike = NodePgDatabase<typeof schema>;
+export { db, type DbLike };
 
 /**
  * Sessions sécurisées EduSync Pro.
@@ -50,6 +55,102 @@ export function adminEmail() {
 /** Clé primaire INTERNE d'un compte — UUID (distincte du login_id public). */
 export function newUserId() {
   return crypto.randomUUID();
+}
+
+/**
+ * Génère un identifiant métier court et unique (utilisé par les fiches
+ * student/teacher créées atomiquement avec un compte app_users).
+ */
+export function newRecordId() {
+  return crypto.randomUUID();
+}
+
+export interface StudentFicheInput {
+  id?: string;
+  first_name: string;
+  last_name: string;
+  gender?: string | null;
+  birth_date?: string | null;
+  matricule?: string | null;
+  class_id?: string | null;
+  user_id: string; // FK → app_users.id (compte STUDENT propriétaire)
+  parent_name?: string | null;
+  parent_phone?: string | null;
+  parent_email?: string | null;
+  address?: string | null;
+  school_year?: string | null;
+  status?: string;
+  created_at?: string;
+}
+
+/**
+ * Crée une fiche student liée à un compte app_users.
+ * Utilisable en-dehors ou à l'intérieur d'une transaction (tx passé en 1er arg).
+ */
+export async function createStudentFiche(store: DbLike, data: StudentFicheInput) {
+  const now = data.created_at ?? new Date().toISOString();
+  const payload = {
+    id: data.id ?? newRecordId(),
+    first_name: data.first_name,
+    last_name: data.last_name,
+    gender: data.gender ?? null,
+    birth_date: data.birth_date ?? null,
+    matricule: data.matricule ?? null,
+    class_id: data.class_id ?? null,
+    user_id: data.user_id,
+    parent_name: data.parent_name ?? null,
+    parent_phone: data.parent_phone ?? null,
+    parent_email: data.parent_email ?? null,
+    address: data.address ?? null,
+    school_year: data.school_year ?? null,
+    status: data.status ?? "actif",
+    created_at: now,
+  };
+  const rows = (await store
+    .insert(students)
+    .values(payload as never)
+    .returning()) as unknown as Record<string, unknown>[];
+  return rows[0] ?? payload;
+}
+
+export interface TeacherFicheInput {
+  id?: string;
+  first_name: string;
+  last_name: string;
+  gender?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  user_id: string; // FK → app_users.id (compte TEACHER propriétaire)
+  subject_names?: string[];
+  hire_date?: string | null;
+  status?: string;
+  created_at?: string;
+}
+
+/**
+ * Crée une fiche teacher liée à un compte app_users.
+ * Utilisable en-dehors ou à l'intérieur d'une transaction (tx passé en 1er arg).
+ */
+export async function createTeacherFiche(store: DbLike, data: TeacherFicheInput) {
+  const now = data.created_at ?? new Date().toISOString();
+  const payload = {
+    id: data.id ?? newRecordId(),
+    first_name: data.first_name,
+    last_name: data.last_name,
+    gender: data.gender ?? null,
+    email: data.email ?? null,
+    phone: data.phone ?? null,
+    user_id: data.user_id,
+    subject_names: data.subject_names ?? [],
+    hire_date: data.hire_date ?? now.split("T")[0],
+    status: data.status ?? "actif",
+    created_at: now,
+  };
+  const rows = (await store
+    .insert(teachers)
+    .values(payload as never)
+    .returning()) as unknown as Record<string, unknown>[];
+  return rows[0] ?? payload;
 }
 
 async function readSetting(key: string): Promise<string | null> {
