@@ -13,7 +13,9 @@
     "mobile:add": "npx cap add android",
     "mobile:open": "npx cap open android",
     "mobile:apk": "cd android && .\\gradlew.bat assembleDebug",
-    "mobile:aab": "cd android && .\\gradlew.bat bundleRelease"
+    "mobile:aab": "cd android && .\\gradlew.bat bundleRelease",
+    "test:security": "node --test scripts/security-regression.test.mjs",
+    "security:audit": "npm audit"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -28,10 +30,11 @@
     "dotenv": "17.3.1",
     "drizzle-orm": "0.45.2",
     "framer-motion": "^13.1.0",
+    "herozion": "^1.2.27",
     "jspdf": "^4.2.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.31.0",
-    "next": "^16.4.0-canary.8",
+    "next": "^16.3.5",
     "pg": "8.20.0",
     "qrcode": "^1.5.4",
     "react": "19.2.6",
@@ -51,8 +54,13 @@
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "playwright": "^1.63.0",
     "postcss": "8.5.8",
     "tailwindcss": "4.1.17",
     "typescript": "~6.0.3"
+  },
+  "overrides": {
+    "uuid": "^13.0.0",
+    "@xmldom/xmldom": "^0.9.12"
   }
 }

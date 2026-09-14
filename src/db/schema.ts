@@ -654,3 +654,32 @@ export const knowledgeHistory = pgTable(
   },
   (table) => [index("knowledge_history_user_idx").on(table.user_id, table.created_at)],
 );
+/* ====================================================================== *
+ *  SÉCURITÉ — RATE LIMITING / ANTI-BRUTE-FORCE (persistant, serverless-safe).
+ *  Comme les fonctions serverless Vercel sont sans état, les compteurs ne
+ *  peuvent PAS vivre en mémoire : ils sont stockés en base PostgreSQL (la
+ *  couche persistante déjà en place), ce qui garantit un comptage global
+ *  cohérent même en scale-out. Deux tables complémentaires :
+ *
+ *    • rate_limit_buckets — compteurs fenêtrés génériques (clé = bucket).
+ *      Utilisés pour : tentatives de login / email, tentatives / IP,
+ *      limites par endpoint sensible (settings, ai/chat, audit, ...).
+ *    • account_lock — verrouillage PROGRESSIF (exponential backoff) d'un
+ *      compte après échecs répétés (clé = login normalisé).
+ *
+ *  Aucune donnée sensible n'y est stockée (jamais de mot de passe ni hash).
+ * ====================================================================== */
+
+export const rateLimitBuckets = pgTable("rate_limit_buckets", {
+  key: text("key").primaryKey(), // ex. "login-email:production:user@example.com"
+  count: integer("count").notNull().default(0),
+  window_started_at: text("window_started_at").notNull(),
+  updated_at: text("updated_at").notNull(),
+});
+
+export const accountLocks = pgTable("account_lock", {
+  key: text("key").primaryKey(), // ex. "lock:production:user@example.com"
+  attempts: integer("attempts").notNull().default(0),
+  locked_until: text("locked_until").notNull(),
+  updated_at: text("updated_at").notNull(),
+});

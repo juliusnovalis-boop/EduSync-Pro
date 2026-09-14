@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  npm-audit:
+    name: Audit de sécurité des dépendances (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: npm audit (fail sur vulnérabilités haute/critique)
+        run: npx audit-ci --high --skip-dev || (echo "::warning::npm audit a détecté des vulnérabilités — voir le rapport ci-dessous." && npm audit)
+
+  security-tests:
+    name: Tests de non-régression sécurité
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tests de sécurité (logic pure, aucune DB requise)
+        run: npm run test:security
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc --noEmit
+        run: npm run typecheck
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci
+          SESSION_SECRET: ci-secret-placeholder
+
+  build:
+    name: Build production (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Vérifier version Next stable (pas de canary)
+        run: node -e "const v=require('./node_modules/next/package.json').version; if(/-canary|-alpha|-beta/.test(v)){console.error('Next version instable interdit en prod:',v);process.exit(1)} console.log('Next stable:',v)"
+      - name: next build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci
+          SESSION_SECRET: ci-secret-placeholder

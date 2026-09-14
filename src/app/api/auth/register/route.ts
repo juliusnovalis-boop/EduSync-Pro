@@ -28,6 +28,18 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
   }
+  // Garde serveur : l'inscription publique ne repose QUE sur une variable
+  // d'environnement SERVEUR (`ALLOW_PUBLIC_REGISTRATION`), jamais sur un
+  // header/cookie client (`x-demo`, `edusync_env`, ...). Désactivée par défaut
+  // (le pentest #9 demande de désactiver l'inscription publique en production —
+  // les comptes sont créés par un admin via /api/auth/users).
+  // ⚠ Variable NON préfixée `NEXT_PUBLIC_` → jamais exposée au navigateur.
+  if (process.env.ALLOW_PUBLIC_REGISTRATION !== "true") {
+    return NextResponse.json(
+      { error: "L'inscription publique est désactivée sur cette instance." },
+      { status: 403 },
+    );
+  }
 
   const body = (await req.json().catch(() => ({}))) as {
     full_name?: string;

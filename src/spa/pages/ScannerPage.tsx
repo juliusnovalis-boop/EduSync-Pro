@@ -100,16 +100,22 @@ export default function ScannerPage() {
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
       setActive(true);
       if (mode === "qr") { setScanning(true); rafRef.current = requestAnimationFrame(scanLoop); }
     } catch {
       toast.error("Caméra inaccessible", { description: "Autorisez l'accès caméra dans votre navigateur." });
     }
   }
+
+  // Attache le flux à l'élément <video> une fois qu'il est monté (active=true).
+  // Sans cet effet, le srcObject assigné avant le montage est perdu et la caméra
+  // reste noire (bug : vidéo sans flux au premier "Activer la caméra").
+  useEffect(() => {
+    if (active && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      void videoRef.current.play().catch(() => {});
+    }
+  }, [active, mode]);
 
   function captureDocument() {
     const video = videoRef.current;

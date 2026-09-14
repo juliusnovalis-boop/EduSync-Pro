@@ -1,0 +1,11 @@
+User-agent: *
+Disallow: /api/
+Disallow: /demo/
+Allow: /
+
+# Chemins privés strictement interdits de l'indexation (protégés par authentification).
+Disallow: /dashboard
+Disallow: /students
+Disallow: /teachers
+Disallow: /settings
+Disallow: /access

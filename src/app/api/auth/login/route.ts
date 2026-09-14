@@ -8,20 +8,34 @@ import { normalizeRole, normalizeStatus, isLoginAllowed, permissionsForRole } fr
 import { logAudit, AUDIT_ACTIONS } from "@/lib/server/audit";
 import { bindRequestEnvironment, type AppEnvironment } from "@/lib/server/environment";
 import { ensureCurrentSchema } from "@/db";
+import { safeParseJson, clientIp, internalErrorResponse } from "@/lib/server/security";
+import { ensureRateLimitSchema, loginRateLimiter } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/auth/login { identifier, password }
  *
- * Authentification UNIFIÉE : tous les comptes (y compris le Super Admin) sont des
- * lignes réelles de `app_users`, authentifiées par login_id + mot de passe.
- * ⚠ AUCUN `if (email === ...)` : le rôle et les droits proviennent de la base,
- * contrôlés par le système d'authentification serveur (jamais du frontend).
+ * Durci (pentest #1 & #4) :
+ *   • `Content-Type` strict → 415 si ce n'est pas du JSON ; JSON invalide → 400
+ *     (plus AUCUN 500 sur body form-urlencoded) ;
+ *   • rate limiting PERSISTANT (PostgreSQL, serverless-safe) par email + par IP,
+ *     et verrouillage progressif (exponential backoff) — réponse 429 avec
+ *     `Retry-After`, message générique ;
+ *   • message d'échec identique pour compte inexistant et mauvais mot de passe
+ *     (pas d'énumération de comptes) ;
+ *   • erreur interne → 500 générique JSON `{ "error": "..." }`, sans stack trace.
  */
 export async function POST(req: NextRequest) {
-  if (!csrfOk(req)) return NextResponse.json({ error: "Requête non autorisée." }, { status: 403 });
-  const { identifier, password } = (await req.json()) as { identifier?: string; password?: string };
+  if (!csrfOk(req)) {
+    return NextResponse.json({ error: "Requête non autorisée." }, { status: 403 });
+  }
+
+  // Corps JSON strict (415 / 400, jamais de crash).
+  const body = await safeParseJson<{ identifier?: string; password?: string }>(req);
+  if (!body.ok) return body.response;
+
+  const { identifier, password } = body.data ?? {};
   const id = String(identifier ?? "").trim();
   const pwd = String(password ?? "");
 
@@ -32,7 +46,18 @@ export async function POST(req: NextRequest) {
   try {
     // Environnement autoritaire côté serveur (header/chemin). Amorce le schéma démo si besoin.
     const environment: AppEnvironment = bindRequestEnvironment(req);
+    await ensureRateLimitSchema();
     await ensureCurrentSchema();
+    const ip = clientIp(req);
+
+    // Anti-brute-force : email (5/15 min) + IP (10/15 min) + verrouillage progressif.
+    const attempt = await loginRateLimiter.recordLoginAttempt(environment, id, ip);
+    if (attempt.status !== "ok") {
+      return NextResponse.json(
+        { error: "Trop de tentatives de connexion. Réessayez plus tard." },
+        { status: 429, headers: { "Retry-After": String(attempt.retryAfterSec ?? 60) } },
+      );
+    }
 
     await ensureAppDefaults();
 
@@ -48,15 +73,27 @@ export async function POST(req: NextRequest) {
     const denied = () => NextResponse.json({ error: "Identifiants incorrects." }, { status: 401 });
 
     if (!user || sha256(pwd) !== user.password_hash) {
+      await loginRateLimiter.onLoginFailure(environment, id);
       await logAudit({ actor_id: id, action: AUDIT_ACTIONS.LOGIN_DENIED, result: "denied" });
       return denied();
     }
 
     const status = normalizeStatus(user.status);
     if (!isLoginAllowed(status)) {
-      await logAudit({ actor_id: user.id, actor_role: user.role, action: AUDIT_ACTIONS.LOGIN_DENIED, result: "denied" });
+      await loginRateLimiter.onLoginFailure(environment, id);
+      await logAudit({
+        actor_id: user.id,
+        actor_role: user.role,
+        action: AUDIT_ACTIONS.LOGIN_DENIED,
+        result: "denied",
+      });
       return NextResponse.json(
-        { error: status === "PENDING" ? "Compte en attente de validation." : "Compte suspendu — contactez votre établissement." },
+        {
+          error:
+            status === "PENDING"
+              ? "Compte en attente de validation."
+              : "Compte suspendu — contactez votre établissement.",
+        },
         { status: 403 },
       );
     }
@@ -65,7 +102,6 @@ export async function POST(req: NextRequest) {
     const schoolId = user.school_id ?? null;
 
     // Création d'une SESSION SÉCURISÉE persistante (révocable) + jeton HMAC signé.
-    // Durée déterminée par le rôle (cf. security-config).
     const created = await createSession({
       userId: user.id,
       role,
@@ -73,12 +109,12 @@ export async function POST(req: NextRequest) {
       userAgent: req.headers.get("user-agent"),
     });
 
+    // Succès → réinitialisation des compteurs anti-brute-force.
+    await loginRateLimiter.onLoginSuccess(environment, id, ip);
     await logAudit({ actor_id: user.id, actor_role: role, action: AUDIT_ACTIONS.LOGIN });
 
-    // Le jeton est remis via un cookie HttpOnly (jamais lisible par JavaScript).
-    // Le corps de réponse transporte uniquement les infos de session (sans jeton).
-    // Mobile (Expo/RN) : le jeton est également exposé dans le corps (`token`)
-    // pour être utilisé en `Authorization: Bearer`. Le client web l'ignore.
+    // Le jeton est remis via un cookie HttpOnly ; le corps porte les infos de
+    // session (sans jeton), avec le jeton exposé uniquement pour le mobile.
     const res = NextResponse.json({
       ok: true,
       token: created.token,
@@ -100,6 +136,6 @@ export async function POST(req: NextRequest) {
     return res;
   } catch (error) {
     console.error("[auth/login]", error);
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    return internalErrorResponse(error);
   }
 }
