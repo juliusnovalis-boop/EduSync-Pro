@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertTable, listRows, createRow, bulkInsert, scopeRowsForActor, attachAccountInfo } from "@/lib/server/data";
-import { resolveDataEnvironment, getSessionActor } from "@/lib/server/auth";
+import { resolveDataEnvironment, getSessionActor, requirePermission } from "@/lib/server/auth";
+import { requiredPermission } from "@/lib/server/data-policy";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * F-22 (pentest #2) — Plafond dur de pagination. Toute valeur `limit` reçue
+ * hors de [1, MAX_LIST_LIMIT] est ramenée dans cet intervalle : impossible de
+ * demander l'extraction intégrale d'une table en une seule requête.
+ */
+const MAX_LIST_LIMIT = 500;
 
 /**
  * Routes de données génériques (dashboard, élèves, enseignants, classes…).
  * L'ENVIRONNEMENT est résolu depuis la SESSION authentifiée (source unique,
  * cohérente avec /api/auth/users) — jamais depuis le seul cookie. En cas
  * d'environnement indéterminé, on renvoie une erreur explicite (jamais []).
+ *
+ * F-7 (pentest #2) : matrice d'autorisation DENY BY DEFAULT (data-policy.ts)
+ * appliquée en plus du scoping par rôle.
  */
 
 /** Lecture : liste les lignes d'une table dans l'environnement de la session. */
@@ -18,10 +29,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tabl
   const { table } = await params;
   try {
     const t = assertTable(table);
+    // F-7 : contrôle de lecture par table (refus 403 si non autorisé).
+    const readPerm = requiredPermission(t, "read");
+    if (readPerm) {
+      const auth = await requirePermission(req, readPerm);
+      if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
     const url = new URL(req.url);
     const order = url.searchParams.get("order") || "created_at";
     const ascending = url.searchParams.get("ascending") === "true";
-    const limit = Number(url.searchParams.get("limit") ?? 2000);
+    /*
+     * F-22 (pentest #2) — `limit` n'était pas borné : un appelant pouvait
+     * demander `?limit=10000` (voire davantage) et forcer l'extraction de toute
+     * la table en une requête, avec un coût mémoire/CPU serveur non maîtrisé
+     * (déni de service + exfiltration massive facilitée).
+     * Désormais : entier valide, borné à [1, MAX_LIST_LIMIT].
+     */
+    const rawLimit = Number(url.searchParams.get("limit") ?? MAX_LIST_LIMIT);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(Math.trunc(rawLimit), 1), MAX_LIST_LIMIT)
+      : MAX_LIST_LIMIT;
     const actor = await getSessionActor(req);
     let rows = await listRows(t, { order, ascending, limit });
     // Périmètre par rôle (multi-établissements) : TEACHER → ses classes affectées,
@@ -50,6 +77,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tab
   const { table } = await params;
   try {
     const t = assertTable(table);
+    // F-7 : écriture par table = permission stricte (STUDENT/PARENT auto-refusés).
+    const writePerm = requiredPermission(t, "create");
+    if (!writePerm) return NextResponse.json({ error: "Opération interdite sur cette table." }, { status: 403 });
+    const auth = await requirePermission(req, writePerm);
+    if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const body = await req.json();
     const isBulk = Array.isArray(body) || (body && typeof body === "object" && "upsert" in body && Array.isArray(body.rows));
     // Refus de la création normale de fiche métier orpheline — flux normal = /api/auth/users.

@@ -34,6 +34,9 @@ export const AUDIT_ACTIONS = {
   SUPER_ADMIN_ACTION: "SUPER_ADMIN_ACTION",
   ACCESS_DENIED: "ACCESS_DENIED",
   SEED_RESET: "SEED_RESET",
+  // F-16/F-19 : anomalie de sécurité détectée (ex. mot de passe par défaut
+  // compromis encore actif, identifiant d'authentification anormal).
+  SECURITY_WARNING: "SECURITY_WARNING",
   ACADEMIC_YEAR_CREATED: "ACADEMIC_YEAR_CREATED",
   ACADEMIC_YEAR_UPDATED: "ACADEMIC_YEAR_UPDATED",
   ACADEMIC_YEAR_ACTIVATED: "ACADEMIC_YEAR_ACTIVATED",

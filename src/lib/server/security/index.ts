@@ -2,6 +2,7 @@
 export * from "./cors";
 export * from "./headers";
 export * from "./http";
+export * from "./password";
 
 export {
   postgresRateLimitStore,

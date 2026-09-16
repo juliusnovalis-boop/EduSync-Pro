@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { appUsers } from "@/db/schema";
-import { sha256, genLoginId, createSession, setSessionCookie } from "@/lib/server/auth";
+import { genLoginId, createSession, setSessionCookie } from "@/lib/server/auth";
+import { hashPassword, satisfiesPasswordPolicy, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from "@/lib/server/security";
 import { ensureAppDefaults } from "@/lib/server/ensure-defaults";
 import { normalizeRole, normalizeStatus, permissionsForRole, ROLES, STATUSES } from "@/lib/server/rbac";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/server/audit";
@@ -54,8 +55,12 @@ export async function POST(req: NextRequest) {
   if (fullName.length < 2) {
     return NextResponse.json({ error: "Veuillez saisir votre nom complet." }, { status: 400 });
   }
-  if (password.length < 4) {
-    return NextResponse.json({ error: "Le mot de passe doit comporter au moins 4 caractères." }, { status: 400 });
+  // F-17 : politique minimale serveur (8–128 caractères) — était 4.
+  if (!satisfiesPasswordPolicy(password)) {
+    return NextResponse.json(
+      { error: `Le mot de passe doit comporter entre ${PASSWORD_MIN_LENGTH} et ${PASSWORD_MAX_LENGTH} caractères.` },
+      { status: 400 },
+    );
   }
 
   await ensureCurrentSchema();
@@ -75,7 +80,7 @@ export async function POST(req: NextRequest) {
     .values({
       id: `usr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       login_id: loginId,
-      password_hash: sha256(password),
+      password_hash: await hashPassword(password),
       full_name: fullName,
       email,
       role: ROLES.ADMIN, // exploration complète du bac à sable démo (rôle existant, inchangé)

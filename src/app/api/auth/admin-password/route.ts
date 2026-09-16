@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { appUsers } from "@/db/schema";
-import { getSessionActor, sha256, createSession, revokeUserSessions, setSessionCookie } from "@/lib/server/auth";
+import { getSessionActor, createSession, revokeUserSessions, setSessionCookie } from "@/lib/server/auth";
+import { hashPassword, verifyPassword, satisfiesPasswordPolicy, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from "@/lib/server/security";
 import { getActiveEnvironment } from "@/lib/server/environment";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/server/audit";
 
@@ -40,17 +41,22 @@ export async function PUT(req: NextRequest) {
     if (!next && !nextEmail) {
       return NextResponse.json({ error: "Rien à modifier (mot de passe ou e-mail)." }, { status: 400 });
     }
-    if (next && (next.length < 6 || next.length > 32)) {
-      return NextResponse.json({ error: "Le nouveau mot de passe doit contenir entre 6 et 32 caractères." }, { status: 400 });
+    if (next && !satisfiesPasswordPolicy(next)) {
+      return NextResponse.json(
+        { error: `Le nouveau mot de passe doit contenir entre ${PASSWORD_MIN_LENGTH} et ${PASSWORD_MAX_LENGTH} caractères.` },
+        { status: 400 },
+      );
     }
     if (nextEmail && !EMAIL_RE.test(nextEmail)) {
       return NextResponse.json({ error: "Format d'e-mail invalide." }, { status: 400 });
     }
 
     // Réauthentification : mot de passe courant obligatoire.
+    // F-17 : vérification scrypt (compatible avec les anciens condensés SHA-256).
     const rows = await db.select({ id: appUsers.id, password_hash: appUsers.password_hash }).from(appUsers).where(eq(appUsers.id, actor.userId)).limit(1);
     const user = rows[0];
-    if (!user || sha256(current) !== user.password_hash) {
+    const reauth = user ? await verifyPassword(current, user.password_hash) : { ok: false, needsRehash: false };
+    if (!user || !reauth.ok) {
       return NextResponse.json({ error: "Mot de passe actuel incorrect." }, { status: 401 });
     }
 
@@ -67,7 +73,8 @@ export async function PUT(req: NextRequest) {
     const now = new Date().toISOString();
     const patch: Record<string, unknown> = { updated_at: now };
     if (next) {
-      patch.password_hash = sha256(next);
+      // F-17 : scrypt + sel aléatoire (plus jamais de SHA-256 non salé).
+      patch.password_hash = await hashPassword(next);
       patch.must_change_password = false;
     }
     if (nextEmail) patch.email = nextEmail;

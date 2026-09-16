@@ -8,6 +8,7 @@ import { appSettings, appUsers, sessions, students, teachers } from "@/db/schema
 import { can, normalizeRole, normalizeStatus, isLoginAllowed, permissionsForRole } from "./rbac";
 import { bindEnvironment, detectEnvironment, getActiveEnvironment, type AppEnvironment } from "./environment";
 import { hmacSecret, newSessionId, sessionDurationMs } from "./security-config";
+import { hashPassword } from "./security/password";
 
 type DbLike = NodePgDatabase<typeof schema>;
 export { db, type DbLike };
@@ -25,11 +26,34 @@ export { db, type DbLike };
  *   4. l'existence, le statut et le RÔLE du compte EN BASE (jamais depuis le jeton) ;
  *   5. la cohérence de l'environnement (session DEMO ≠ OFFICIEL).
  *
- * Mots de passe stockés en SHA-256, jamais en clair.
+ * Mots de passe stockés en scrypt + sel aléatoire (jamais en clair, jamais en
+ * simple SHA-256) — voir `./security/password`. Les anciens condensés SHA-256
+ * restent vérifiables et sont ré-hachés automatiquement à la connexion (F-17).
  */
 
+/**
+ * @deprecated (F-17) Ne JAMAIS hacher un mot de passe avec cette fonction —
+ * utiliser `hashPassword()` / `verifyPassword()` de `./security/password`.
+ * Conservée pour la signature de session historique (`signToken`) uniquement.
+ */
 export function sha256(input: string) {
   return crypto.createHash("sha256").update(String(input)).digest("hex");
+}
+
+/**
+ * F-19 (pentest #2) — Empreinte non réversible d'un identifiant de connexion.
+ *
+ * Le journal d'audit doit permettre de CORRÉLER les tentatives répétées sur un
+ * même identifiant (détection de brute-force) sans jamais stocker l'identifiant
+ * en clair : un utilisateur peut se tromper de champ et saisir son mot de passe
+ * dans la case « identifiant ». On journalise donc une empreinte HMAC tronquée
+ * (80 bits, non réversible sans le secret serveur), jamais l'entrée brute.
+ */
+export function identifierFingerprint(raw: string): string {
+  const normalized = String(raw ?? "").trim().toLowerCase().slice(0, 512);
+  if (!normalized) return "fp:anonyme";
+  const digest = crypto.createHmac("sha256", hmacSecret()).update(normalized).digest("hex");
+  return `fp:${digest.slice(0, 20)}`;
 }
 
 /** Identifiant de connexion PUBLIC — format officiel EDU-XXXXXXXX (12 caractères). */
@@ -170,14 +194,23 @@ async function writeSetting(key: string, value: string) {
     .onConflictDoUpdate({ target: appSettings.key, set: { value, updated_at: now } });
 }
 
-export async function getAdminPasswordHash() {
+/**
+ * F-16/F-17 (pentest #2) — AUCUN mot de passe par défaut codé en dur.
+ * Avant : repli sur le condensé de « admin26 » (identifiant public ET
+ * prévisible) → prise de contrôle totale du Super Admin sur toute instance
+ * n'ayant pas défini SUPER_ADMIN_PASSWORD.
+ * Désormais : la valeur en base fait autorité ; sinon on dérive (et persiste)
+ * le condensé scrypt du mot de passe fourni par la configuration. Si aucune
+ * des deux sources n'existe, on renvoie `null` → le compte n'est pas amorcé.
+ */
+export async function getAdminPasswordHash(): Promise<string | null> {
   const dbValue = await readSetting("admin_password_hash");
-  const defaultHash = sha256("admin26");
+  if (dbValue) return dbValue;
   const envPwd = process.env.SUPER_ADMIN_PASSWORD;
-  const envHash = envPwd ? sha256(envPwd) : null;
-  if (dbValue && dbValue !== defaultHash && dbValue !== envHash) return dbValue;
-  if (envHash) return envHash;
-  return dbValue || defaultHash;
+  if (!envPwd) return null;
+  const hash = await hashPassword(envPwd);
+  await setAdminPasswordHash(hash);
+  return hash;
 }
 
 export async function setAdminPasswordHash(hash: string) {

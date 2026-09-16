@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { appUsers, establishments, students, teachers } from "@/db/schema";
-import { requirePermission, sha256, genLoginId, genPassword, newUserId, createStudentFiche, createTeacherFiche, revokeUserSessions } from "@/lib/server/auth";
+import { requirePermission, genLoginId, genPassword, newUserId, createStudentFiche, createTeacherFiche, revokeUserSessions } from "@/lib/server/auth";
+import { hashPassword } from "@/lib/server/security";
 import { PERMISSIONS, ROLES, CREATABLE_ROLES, normalizeRole, normalizeStatus, roleRank } from "@/lib/server/rbac";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/server/audit";
 
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
     const row = {
       id: userId,
       login_id: loginId, // EDU-XXXXXXXX, unicité vérifiée ci-dessus
-      password_hash: sha256(password), // jamais de mot de passe en clair
+      password_hash: await hashPassword(password), // F-17 : scrypt + sel, jamais en clair
       full_name: String(full_name).trim(),
       email: email ?? null,
       role: finalRole,
@@ -241,7 +242,7 @@ export async function PUT(req: NextRequest) {
     let newPassword: string | null = null;
     if (regenerate) {
       newPassword = genPassword();
-      update.password_hash = sha256(newPassword);
+      update.password_hash = await hashPassword(newPassword);
     }
 
     const [updated] = await db.update(appUsers).set(update).where(eq(appUsers.id, id)).returning();

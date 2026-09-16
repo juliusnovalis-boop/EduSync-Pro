@@ -13,6 +13,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +34,14 @@ import {
   ipBucketKey,
   normalizeLoginKey,
 } from "../src/lib/server/security/rate-limit-core.ts";
+import {
+  hashPassword,
+  verifyPassword,
+  isLegacySha256Hash,
+  legacySha256,
+  satisfiesPasswordPolicy,
+  isKnownDefaultPassword,
+} from "../src/lib/server/security/password.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const here = (...p) => path.join(ROOT, ...p);
@@ -301,6 +310,44 @@ test("CI : job npm-audit + guard anti-canary + dependabot", () => {
   assert.ok(exists(".github/dependabot.yml"), "dependabot activé");
   assert.match(read(".github/dependabot.yml"), /package-ecosystem: "npm"/);
 });
+/* ========= PENTEST #2 — F-16 / F-17 / F-18 / F-19 / F-20 / F-22 ======== */
+
+test("F-17 (exécution) : scrypt salé, vérification correcte, migration legacy", async () => {
+  const hash = await hashPassword("Correct-Horse-9");
+  assert.match(hash, /^scrypt\$/, "format auto-descriptif scrypt$N$r$p$salt$hash");
+  assert.notEqual(hash, await hashPassword("Correct-Horse-9"), "sel aléatoire par utilisateur");
+
+  assert.equal((await verifyPassword("Correct-Horse-9", hash)).ok, true);
+  assert.equal((await verifyPassword("Correct-Horse-9", hash)).needsRehash, false);
+  assert.equal((await verifyPassword("mauvais", hash)).ok, false);
+
+  const legacy = legacySha256("admin26");
+  assert.equal(isLegacySha256Hash(legacy), true);
+  const migrated = await verifyPassword("admin26", legacy);
+  assert.equal(migrated.ok, true, "un compte legacy reste connectable (aucun verrouillage)");
+  assert.equal(migrated.needsRehash, true, "le compte legacy doit être ré-haché en scrypt");
+  assert.equal((await verifyPassword("autre", legacy)).ok, false);
+});
+
+test("F-17 : entrées dégradées \u2192 refus silencieux, jamais d'exception", async () => {
+  assert.equal((await verifyPassword("x", null)).ok, false);
+  assert.equal((await verifyPassword("x", undefined)).ok, false);
+  assert.equal((await verifyPassword("x", "")).ok, false);
+  assert.equal((await verifyPassword("x", "scrypt$corrompu")).ok, false);
+  assert.equal((await verifyPassword("x", "scrypt$16384$8$1$!!$!!")).ok, false);
+  assert.equal((await verifyPassword("x", "hash-inconnu")).ok, false);
+});
+
+test("F-17 : politique de mot de passe serveur (8\u2013128) et d\u00e9tection de fuite", () => {
+  assert.equal(satisfiesPasswordPolicy("court"), false);
+  assert.equal(satisfiesPasswordPolicy("motdepasse"), true);
+  assert.equal(satisfiesPasswordPolicy("a".repeat(129)), false);
+  assert.equal(isKnownDefaultPassword("admin26"), true, "secret historiquement fuit\u00e9");
+  assert.equal(isKnownDefaultPassword("demo2026"), true);
+  assert.equal(isKnownDefaultPassword("un-vrai-secret"), false);
+});
+
+
 
 /* ============ PENTEST #10 — transverse (gitignore, secrets) ============ */
 
@@ -310,3 +357,104 @@ test("secrets : .env* ignoré par git, aucune clé de seme dans src", () => {
   assert.doesNotMatch(aiSrc, /AIza[0-9A-Za-z_-]{20}/, "aucune clé Gemini codée en dur");
   assert.doesNotMatch(aiSrc, /sk-or-/, "aucun token OpenRouter codé en dur");
 });
+test("F-17 : aucune route ne hache plus un mot de passe en sha256 non salé", () => {
+  for (const file of [
+    "src/app/api/auth/login/route.ts",
+    "src/app/api/auth/register/route.ts",
+    "src/app/api/auth/users/route.ts",
+    "src/app/api/auth/admin-password/route.ts",
+  ]) {
+    const src = read(file);
+    assert.doesNotMatch(src, /password_hash\s*[:=]\s*sha256\(/, `${file} : hachage scrypt attendu`);
+    assert.doesNotMatch(src, /sha256\([A-Za-z]+\)\s*!==\s*user\.password_hash/, `${file} : comparaison sha256 supprimée`);
+  }
+  const login = read("src/app/api/auth/login/route.ts");
+  assert.match(login, /verifyPassword\(/, "login : vérification scrypt");
+  assert.match(login, /check\.needsRehash/, "login : rehash transparent");
+  assert.match(read("src/lib/server/ensure-defaults.ts"), /await hashPassword\(/, "amorçage : scrypt");
+});
+
+test("F-16/F-17 : aucun mot de passe par défaut codé en dur dans le dépôt", () => {
+  const ensureDefaults = read("src/lib/server/ensure-defaults.ts");
+  for (const secret of ["admin26", "demo2026", "teach2026", "stu2026"]) {
+    assert.doesNotMatch(ensureDefaults, new RegExp(`"${secret}"`), `secret « ${secret} » toujours en dur`);
+  }
+  assert.doesNotMatch(read("src/lib/server/auth.ts"), /sha256\("admin26"\)/, "repli admin26 supprimé");
+  assert.match(ensureDefaults, /SUPER_ADMIN_PASSWORD absent/, "avertissement explicite si non configuré");
+  assert.match(ensureDefaults, /SEED_DEMO_ACCOUNTS/, "comptes démo sur opt-in explicite");
+});
+
+test("F-18 : le seed exige SYSTEM_MANAGE avant TOUTE écriture", () => {
+  const seed = read("src/app/api/seed/route.ts");
+  assert.match(seed, /requirePermission\(req, PERMISSIONS\.SYSTEM_MANAGE\)/);
+  const gateIndex = seed.indexOf("requirePermission(req, PERMISSIONS.SYSTEM_MANAGE)");
+  const firstWriteIndex = seed.indexOf("await wipeTable(");
+  assert.ok(
+    gateIndex > -1 && firstWriteIndex > -1 && gateIndex < firstWriteIndex,
+    "autorisation vérifiée avant wipeTable/insert",
+  );
+  assert.match(seed, /if \("error" in auth\)/, "401/403 renvoyés sans exécuter le seed");
+});
+
+test("F-19 : l'identifiant brut n'est jamais journalisé dans l'audit", () => {
+  const login = read("src/app/api/auth/login/route.ts");
+  assert.match(login, /identifierFingerprint\(id\)/, "empreinte HMAC au lieu de l'identifiant brut");
+  assert.doesNotMatch(login, /actor_id: id,/, "l'identifiant saisi n'est plus écrit tel quel");
+  const auth = read("src/lib/server/auth.ts");
+  assert.match(auth, /export function identifierFingerprint/);
+  assert.match(auth, /createHmac\("sha256"/, "empreinte non réversible (HMAC)");
+});
+
+test("F-20 : verify-qr limité en débit, jeton validé, erreur générique", () => {
+  const qr = read("src/app/api/verify-qr/[token]/route.ts");
+  assert.match(qr, /checkEndpoint/, "rate limiting par IP");
+  assert.match(qr, /ensureRateLimitSchema/, "schéma auto-créé");
+  assert.match(qr, /SENSITIVE_ENDPOINT_LIMIT/);
+  assert.match(qr, /QR_TOKEN_RE/, "validation de forme du jeton avant SQL");
+  assert.match(qr, /internalErrorResponse/, "500 générique sans stack trace");
+  assert.doesNotMatch(qr, /\(error as Error\)\.message/, "aucune fuite de message d'erreur interne");
+  assert.match(qr, /no-store/, "réponse non mise en cache");
+});
+
+test("F-22 : le paramètre limit est borné (route ET moteur)", () => {
+  const route = read("src/app/api/data/[table]/route.ts");
+  assert.match(route, /const MAX_LIST_LIMIT = 500/, "plafond d'API explicite");
+  assert.match(route, /Math\.min\(Math\.max\(Math\.trunc\(rawLimit\), 1\), MAX_LIST_LIMIT\)/);
+  const data = read("src/lib/server/data.ts");
+  assert.match(data, /const LIST_HARD_CAP = 5000/, "plafond dur du moteur de données");
+  assert.doesNotMatch(data, /Math\.min\(Number\(limit\) \|\| 2000, 10000\)/, "ancien plafond 10000 supprimé");
+});
+
+test("F-7 : plus de repli « return rows » global (deny by default)", () => {
+  const data = read("src/lib/server/data.ts");
+  assert.match(data, /if \(!actor\) return \[\];/, "aucun acteur → aucune donnée");
+  assert.doesNotMatch(data, /if \(!actor\) return rows;/, "ancien repli permissif supprimé");
+  assert.doesNotMatch(data, /if \(table !== "students" && table !== "classes"\) return rows;/, "repli TEACHER supprimé");
+  assert.match(data, /OWNER_COLUMNS\[table\]/, "propriété de ligne appliquée en LECTURE");
+  assert.match(data, /requiredPermission\(table, "read"\) === null/, "repli borné par la matrice");
+});
+
+test("F-7 : matrice d'autorisation deny-by-default + anti-IDOR", () => {
+  const policy = read("src/lib/server/data-policy.ts");
+  assert.match(policy, /export const TABLE_POLICY/);
+  assert.match(policy, /export const OWNER_COLUMNS/);
+  assert.match(policy, /export function canWriteRow/);
+  assert.match(policy, /roleRank\(actorRole\) >= roleRank\(ROLES\.ADMIN\)/);
+  const list = read("src/app/api/data/[table]/route.ts");
+  assert.match(list, /requiredPermission\(t, "read"\)/);
+  assert.match(list, /requiredPermission\(t, "create"\)/);
+  const one = read("src/app/api/data/[table]/[id]/route.ts");
+  assert.match(one, /requiredPermission\(t, op\)/);
+  assert.match(one, /canWriteRow/, "contrôle de propriété avant update/delete");
+  assert.match(one, /if \(table === "students" \|\| table === "teachers"\)/, "tables gérées par route dédiée refusées");
+});
+
+test("F-16 : .env non suivi par git et ignoré (aucun secret dans le dépôt)", () => {
+  assert.match(read(".gitignore"), /\.env/, ".gitignore couvre .env");
+  const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" })
+    .split(/\r?\n/)
+    .filter((f) => /(^|\/)\.env(\.|$)/.test(f) && !f.endsWith(".env.example"));
+  assert.deepEqual(tracked, [], `fichiers .env encore suivis par git : ${tracked.join(", ")}`);
+});
+
+

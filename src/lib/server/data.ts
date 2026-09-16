@@ -1,5 +1,7 @@
 import { sql, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { OWNER_COLUMNS, requiredPermission } from "./data-policy";
+import { ROLES, roleRank } from "./rbac";
 import {
   provinces,
   establishments,
@@ -199,7 +201,8 @@ export async function listRows(table: TableName, options: Options = {}) {
   const orderCol = allowed.includes(order) ? order : "created_at";
   const dir = ascending ? "ASC" : "DESC";
   const nulls = ascending ? "FIRST" : "LAST";
-  const safeLimit = Math.min(Number(limit) || 2000, 10000);
+  // F-22 : plafond dur interne (l'API est en plus bornée à MAX_LIST_LIMIT).
+  const safeLimit = Math.min(Number(limit) || 2000, LIST_HARD_CAP);
   const rows = (await db
     .select()
     .from(t as never)
@@ -207,6 +210,13 @@ export async function listRows(table: TableName, options: Options = {}) {
     .limit(safeLimit)) as unknown as Record<string, unknown>[];
   return coerceOnRead(table, rows);
 }
+
+/**
+ * F-22 (pentest #2) — Plafond dur de lecture, appliqué au niveau du moteur de
+ * données (en complément du plafond d'API). Aucun appelant, même interne, ne
+ * peut demander l'extraction illimitée d'une table.
+ */
+const LIST_HARD_CAP = 5000;
 
 /**
  * Périmètre de lecture par rôle (modèle multi-établissements).
@@ -218,17 +228,54 @@ export async function listRows(table: TableName, options: Options = {}) {
  * - ADMIN / SUPER_ADMIN : pas de filtrage supplémentaire (RBAC existant).
  * Le schoolId de session reste le contexte actif ; il n'est PAS utilisé pour
  * couper la relation parent multi-écoles.
+ *
+ * F-7 (pentest #2) — ordre de décision STRICT et DENY BY DEFAULT :
+ *   0. aucun acteur           → aucune ligne ;
+ *   1. ADMIN+                 → règles RBAC/matrice seules ;
+ *   2. table owner-scoped     → uniquement SES lignes (propriété de ligne) ;
+ *   3. TEACHER/PARENT/STUDENT → périmètre explicite ci-dessous ;
+ *   4. toute autre combinaison→ refus (sauf table `read: null`).
  */
 export async function scopeRowsForActor(
   table: TableName,
   rows: Record<string, unknown>[],
   actor: { role: string; userId: string } | null,
 ): Promise<Record<string, unknown>[]> {
-  if (!actor) return rows;
-  if (actor.role === "SUPER_ADMIN" || actor.role === "ADMIN") return rows;
+  // F-7 : aucun acteur identifié → AUCUNE donnée (deny by default).
+  if (!actor) return [];
+
+  // 1) ADMIN / SUPER_ADMIN : le RBAC et la matrice par table font foi.
+  if (roleRank(actor.role) >= roleRank(ROLES.ADMIN)) return rows;
+
+  // 2) PROPRIÉTÉ DE LIGNE — prioritaire sur toute autre règle. Avant ce
+  // correctif, la propriété n'était vérifiée qu'en écriture (canWriteRow) :
+  // un PARENT/STUDENT pouvait donc LISTER les notifications, messages et
+  // conversations IA de n'importe quel autre utilisateur (IDOR en lecture).
+  const ownerCol = OWNER_COLUMNS[table];
+  if (ownerCol) {
+    if (ownerCol === "conversation_id") {
+      // ai_conversation_messages : la propriété est celle de la conversation.
+      const owned = (await db
+        .select({ id: aiConversations.id })
+        .from(aiConversations as never)
+        .where(eq(aiConversations.user_id, actor.userId))) as unknown as { id: string }[];
+      const ownedIds = new Set(owned.map((c) => String(c.id)));
+      return rows.filter((r) => ownedIds.has(String(r.conversation_id)));
+    }
+    return rows.filter((r) => r[ownerCol] != null && String(r[ownerCol]) === String(actor.userId));
+  }
+
+  /**
+   * F-7 — REPLI EXPLICITE ET BORNÉ.
+   * L'ancien code terminait par `return rows` : toute combinaison rôle/table
+   * non prévue renvoyait l'INTÉGRALITÉ de la table. Désormais, seules les
+   * tables que la matrice déclare lisibles par tout acteur authentifié
+   * (`read: null`) passent ; toute autre combinaison est REFUSÉE (tableau vide).
+   */
+  const publicRead = requiredPermission(table, "read") === null;
 
   if (actor.role === "TEACHER") {
-    if (table !== "students" && table !== "classes") return rows;
+    if (table !== "students" && table !== "classes") return publicRead ? rows : [];
     const prof = (await db.select().from(teachers as never).where(eq(teachers.user_id, actor.userId)).limit(1)) as unknown as { id: string }[];
     if (!prof.length) return [];
     const ca = (await db
@@ -241,7 +288,8 @@ export async function scopeRowsForActor(
   }
 
   if (actor.role === "PARENT") {
-    if (!["students", "grades", "attendance", "payments"].includes(table)) return rows;
+    const scopedTables = ["students", "grades", "attendance", "payments", "digital_documents", "attendance_qr_records"];
+    if (!scopedTables.includes(table)) return publicRead ? rows : [];
     const links = (await db
       .select()
       .from(parentStudentLinks as never)
@@ -253,15 +301,18 @@ export async function scopeRowsForActor(
 
   if (actor.role === "STUDENT") {
     if (table === "students") return rows.filter((r) => r.user_id === actor.userId);
-    if (["grades", "attendance", "payments"].includes(table)) {
+    const ownDataTables = ["grades", "attendance", "payments", "digital_documents", "attendance_qr_records"];
+    if (ownDataTables.includes(table)) {
       const me = (await db.select().from(students as never).where(eq(students.user_id, actor.userId)).limit(1)) as unknown as { id: string }[];
       if (!me.length) return [];
       return rows.filter((r) => String(r.student_id) === me[0].id);
     }
-    return rows;
+    // Annonces, devoirs, emploi du temps, référentiels : lecture pédagogique.
+    return publicRead ? rows : [];
   }
 
-  return rows;
+  // Rôle non reconnu → aucune donnée (deny by default).
+  return [];
 }
 /**
  * Enrichit les fiches métier (students / teachers) avec les données du compte
@@ -345,6 +396,41 @@ export async function deleteRow(table: TableName, id: string) {
     .where(sql`"id" = ${id}`)
     .returning({ id: sql`1` })) as unknown[];
   return rows.length > 0;
+}
+
+/**
+ * F-7 (pentest #2) — Résolution du PROPRIÉTAIRE d'une ligne, pour l'anti-IDOR
+ * des routes génériques PUT/DELETE. Renvoie `exists: false` si la ligne
+ * n'existe pas (→ 404), sinon `ownerId` (valeur de la colonne propriétaire,
+ * ou `null` si la table n'est pas owner-scoped / la colonne est vide).
+ *
+ * `ai_conversation_messages` n'a pas de colonne `user_id` : son propriétaire
+ * est celui de la conversation parente (résolu ici).
+ */
+export async function getRowOwnerId(
+  table: TableName,
+  id: string,
+  ownerColumn: string | undefined,
+): Promise<{ exists: boolean; ownerId: unknown }> {
+  const t = REGISTRY[table];
+  const rows = (await db
+    .select()
+    .from(t as never)
+    .where(sql`"id" = ${id}`)
+    .limit(1)) as unknown as Record<string, unknown>[];
+  const row = rows[0];
+  if (!row) return { exists: false, ownerId: null };
+  if (!ownerColumn) return { exists: true, ownerId: null };
+  let ownerId: unknown = row[ownerColumn];
+  if (ownerColumn === "conversation_id") {
+    const conv = (await db
+      .select()
+      .from(REGISTRY.ai_conversations as never)
+      .where(sql`"id" = ${String(ownerId ?? "")}`)
+      .limit(1)) as unknown as Record<string, unknown>[];
+    ownerId = conv[0]?.user_id ?? null;
+  }
+  return { exists: true, ownerId };
 }
 
 export async function countRows(table: TableName) {

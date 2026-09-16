@@ -16,10 +16,16 @@ export async function POST(req: NextRequest) {
   const url = new URL(req.url);
   const reset = url.searchParams.get("reset") === "1";
 
-  // La réinitialisation globale est une opération destructrice réservée au Super Admin.
+  /**
+   * F-18 (pentest #2) : TOUTE exécution du seed écrit des données → la
+   * permission SYSTEM_MANAGE est OBLIGATOIRE sur tous les chemins (reset ou
+   * non), quels que soient les query params, headers ou l'environnement.
+   * Un anonyme reçoit 401 ; un authentifié sans SYSTEM_MANAGE reçoit 403.
+   */
+  const auth = await requirePermission(req, PERMISSIONS.SYSTEM_MANAGE);
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   if (reset) {
-    const auth = await requirePermission(req, PERMISSIONS.SYSTEM_MANAGE);
-    if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
     await logAudit({ actor_id: auth.actor.userId, actor_role: auth.actor.role, action: AUDIT_ACTIONS.SEED_RESET });
   }
 

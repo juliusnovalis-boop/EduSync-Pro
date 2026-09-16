@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { appUsers } from "@/db/schema";
-import { sha256, createSession, setSessionCookie, csrfOk } from "@/lib/server/auth";
+import { createSession, setSessionCookie, csrfOk, identifierFingerprint } from "@/lib/server/auth";
+import { verifyPassword, hashPassword, isKnownDefaultPassword } from "@/lib/server/security";
 import { ensureAppDefaults } from "@/lib/server/ensure-defaults";
 import { normalizeRole, normalizeStatus, isLoginAllowed, permissionsForRole } from "@/lib/server/rbac";
 import { logAudit, AUDIT_ACTIONS } from "@/lib/server/audit";
@@ -72,9 +73,26 @@ export async function POST(req: NextRequest) {
     // Message volontairement identique (ne fuite pas l'existence du compte).
     const denied = () => NextResponse.json({ error: "Identifiants incorrects." }, { status: 401 });
 
-    if (!user || sha256(pwd) !== user.password_hash) {
+    /*
+     * F-17 (pentest #2) — Vérification scrypt (sel aléatoire par utilisateur,
+     * comparaison à temps constant). Les comptes encore stockés en SHA-256 non
+     * salé restent acceptés puis sont ré-hachés immédiatement (migration
+     * transparente, aucun utilisateur bloqué).
+     */
+    const check = user
+      ? await verifyPassword(pwd, user.password_hash)
+      : { ok: false, needsRehash: false };
+
+    if (!user || !check.ok) {
       await loginRateLimiter.onLoginFailure(environment, id);
-      await logAudit({ actor_id: id, action: AUDIT_ACTIONS.LOGIN_DENIED, result: "denied" });
+      // F-19 : JAMAIS l'identifiant brut dans le journal d'audit (l'utilisateur
+      // peut avoir saisi son mot de passe dans le champ identifiant). On
+      // journalise une empreinte HMAC tronquée, corrélable sans être réversible.
+      await logAudit({
+        actor_id: identifierFingerprint(id),
+        action: AUDIT_ACTIONS.LOGIN_DENIED,
+        result: "denied",
+      });
       return denied();
     }
 
@@ -100,6 +118,43 @@ export async function POST(req: NextRequest) {
 
     const role = normalizeRole(user.role);
     const schoolId = user.school_id ?? null;
+
+    /*
+     * F-17 : migration transparente des comptes encore en SHA-256 non salé.
+     * Le mot de passe en clair est immédiatement re-haché en scrypt + sel.
+     * Un échec d'écriture ne bloque jamais la connexion (le compte reste
+     * fonctionnel, il sera retenté à la prochaine connexion).
+     */
+    if (check.needsRehash) {
+      try {
+        await db
+          .update(appUsers)
+          .set({ password_hash: await hashPassword(pwd), updated_at: new Date().toISOString() })
+          .where(eq(appUsers.id, user.id));
+      } catch (rehashError) {
+        console.error("[auth/login] rehash scrypt échoué :", rehashError);
+      }
+    }
+
+    /*
+     * F-16 : alerte d'audit si le compte se connecte encore avec un mot de
+     * passe ayant fuité dans le code source. La rotation est une action
+     * opérateur (interface « Gestion des accès » / variable d'environnement) —
+     * elle n'est jamais imposée automatiquement pour ne pas verrouiller le
+     * compte hors de sa propre procédure de récupération.
+     */
+    if (isKnownDefaultPassword(pwd)) {
+      await logAudit({
+        actor_id: user.id,
+        actor_role: role,
+        action: AUDIT_ACTIONS.SECURITY_WARNING,
+        result: "error",
+        metadata: {
+          reason: "mot de passe par défaut compromis encore actif",
+          action_requise: "rotation immédiate du mot de passe",
+        },
+      });
+    }
 
     // Création d'une SESSION SÉCURISÉE persistante (révocable) + jeton HMAC signé.
     const created = await createSession({
