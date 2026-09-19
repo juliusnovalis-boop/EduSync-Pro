@@ -39,7 +39,8 @@ skills-lock.json
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
 
-# Vercel.vercel/
+# Vercel
+.vercel/
 # Artifacts de debug locaux
 debug-*.png
 debug-*.mjs

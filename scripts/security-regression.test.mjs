@@ -416,6 +416,20 @@ test("F-20 : verify-qr limité en débit, jeton validé, erreur générique", ()
   assert.match(qr, /no-store/, "réponse non mise en cache");
 });
 
+/* ==== Hygiène — règle .gitignore réellement active (CR parasite) ==== */
+
+test("F-16 : la règle .vercel/ du .gitignore est réellement active", () => {
+  // Défaut trouvé en re-pentest : un CR parasite fusionnait « # Vercel » et
+  // « .vercel/ » en UNE seule ligne. Comme elle commençait par « # », git la
+  // traitait comme un commentaire : la règle n'existait donc pas. Conséquence :
+  // .vercel/project.json était committable par un simple `git add -A`, et
+  // .vercel/.env.production.local (porteur de secrets) n'était couvert que
+  // par ricochet via la règle `.env.*.local`.
+  const gi = read(".gitignore");
+  assert.match(gi, /^\.vercel\/\s*$/m, "règle .vercel/ présente sur sa propre ligne");
+  assert.doesNotMatch(gi, /#\s*Vercel\r?\.vercel\//, "aucun CR ne fusionne le commentaire et la règle");
+});
+
 /* ==== PENTEST #2 (re-run) — F-23 : disponibilité (pooler PostgreSQL) ==== */
 
 test("F-23 : les pools PostgreSQL sont bornés (max + timeouts)", () => {
