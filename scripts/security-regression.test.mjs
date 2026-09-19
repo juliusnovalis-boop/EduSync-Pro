@@ -416,6 +416,45 @@ test("F-20 : verify-qr limité en débit, jeton validé, erreur générique", ()
   assert.match(qr, /no-store/, "réponse non mise en cache");
 });
 
+/* ==== PENTEST #2 (re-run) — F-23 : disponibilité (pooler PostgreSQL) ==== */
+
+test("F-23 : les pools PostgreSQL sont bornés (max + timeouts)", () => {
+  const db = read("src/db/index.ts");
+  assert.match(db, /new Pool\(\{/, "construction du pool");
+  assert.match(db, /max:\s*\d+/, "plafond `max` explicite par instance");
+  assert.match(db, /idleTimeoutMillis:\s*\d+/, "libération des connexions inactives");
+  assert.match(db, /connectionTimeoutMillis:\s*\d+/, "échec rapide au lieu de requêtes suspendues");
+  const maxMatch = db.match(/max:\s*(\d+)/);
+  assert.ok(maxMatch, "valeur de `max` lisible");
+  // Deux pools par instance (production + démo) : le total doit rester sous la
+  // capacité du pooler PostgreSQL (mode session, pool_size 15), sinon
+  // EMAXCONNSESSION se reproduit et un burst concurrent provoque des 500.
+  assert.ok(
+    Number(maxMatch[1]) * 2 < 15,
+    `max=${maxMatch[1]} × 2 pools doit rester < 15 (capacité du pooler)`,
+  );
+});
+
+test("F-23 : ensureRateLimitSchema n'exécute plus le DDL à chaque requête", () => {
+  const s = read("src/lib/server/security/rate-limit.ts");
+  assert.match(s, /let rateLimitSchemaPromise/, "garde single-flight présente");
+  assert.match(s, /if \(rateLimitSchemaPromise\) return rateLimitSchemaPromise/, "chemin chaud O(1)");
+  assert.doesNotMatch(
+    s,
+    /export async function ensureRateLimitSchema\(\): Promise<void> \{\s*await postgresRateLimitStore\.ensureSchema\(\);/,
+    "plus de CREATE TABLE sur chaque requête",
+  );
+});
+
+test("F-23 : verify-qr répond 503 (fail-closed) si le limiteur est indisponible", () => {
+  const qr = read("src/app/api/verify-qr/[token]/route.ts");
+  assert.match(qr, /catch \(limiterError\)/, "bloc de garde dédié autour du limiteur");
+  assert.match(qr, /status: 503/, "503 Service Unavailable au lieu d'un 500 opaque");
+  assert.match(qr, /limiteur indisponible/, "cause journalisée côté serveur");
+  assert.match(qr, /Retry-After/, "backoff explicite pour les clients");
+  assert.match(qr, /checkEndpoint/, "le limiteur reste traversé (fail-closed, F-20 préservé)");
+});
+
 test("F-22 : le paramètre limit est borné (route ET moteur)", () => {
   const route = read("src/app/api/data/[table]/route.ts");
   assert.match(route, /const MAX_LIST_LIMIT = 500/, "plafond d'API explicite");

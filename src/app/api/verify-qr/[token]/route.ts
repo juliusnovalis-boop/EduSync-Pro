@@ -10,6 +10,7 @@ import {
   internalErrorResponse,
   loginRateLimiter,
   SENSITIVE_ENDPOINT_LIMIT,
+  type WindowResult,
 } from "@/lib/server/security";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +36,28 @@ const QR_TOKEN_RE = /^[A-Za-z0-9_-]{6,128}$/;
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
-    await ensureRateLimitSchema();
-    const rl = await loginRateLimiter.checkEndpoint(clientIp(req), "verify-qr", SENSITIVE_ENDPOINT_LIMIT);
+    /*
+     * F-23 (re-pentest #2) - Le limiteur est FAIL-CLOSED mais DIFFERENCIE.
+     *
+     * Si le backend du limiteur est momentanement indisponible (ex. pooler
+     * PostgreSQL sature -> EMAXCONNSESSION), on repond 503 Service Unavailable
+     * + Retry-After : un signal honnete et exploitable par les clients, au lieu
+     * de laisser l infrastructure produire un 500 opaque en cascade.
+     *
+     * On reste FAIL-CLOSED : la requete n est JAMAIS servie sans passer par le
+     * limiteur, sinon l oracle d enumeration corrige en F-20 se rouvrirait.
+     */
+    let rl: WindowResult;
+    try {
+      await ensureRateLimitSchema();
+      rl = await loginRateLimiter.checkEndpoint(clientIp(req), "verify-qr", SENSITIVE_ENDPOINT_LIMIT);
+    } catch (limiterError) {
+      console.error("[verify-qr] limiteur indisponible:", limiterError);
+      return NextResponse.json(
+        { error: "Service temporairement indisponible. Reessayez dans quelques instants." },
+        { status: 503, headers: { "Retry-After": "5" } },
+      );
+    }
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Trop de requêtes. Réessayez plus tard." },

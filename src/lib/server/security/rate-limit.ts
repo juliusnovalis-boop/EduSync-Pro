@@ -84,9 +84,31 @@ class PostgresRateLimitStore implements RateLimitStore {
 /** Store singleton PostgreSQL (produit). */
 export const postgresRateLimitStore: RateLimitStore = new PostgresRateLimitStore();
 
-/** S'assure que les tables de rate-limiting existent (idempotent, scale-out safe). */
+/**
+ * F-23 (re-pentest #2) - DDL execute UNE seule fois par processus.
+ *
+ * Avant : `ensureRateLimitSchema()` lancait `CREATE TABLE IF NOT EXISTS`
+ * A CHAQUE requete sur chacun des endpoints durcis. En plus d'etre inutile,
+ * cela multipliait les allers-retours PostgreSQL derriere un pooler a
+ * capacite bornee (pool_size 15) : un burst concurrent sur un endpoint
+ * PUBLIC (verify-qr) saturait le pooler ->
+ * `(EMAXCONNSESSION) max clients reached in session mode` (FATAL, XX000)
+ * -> HTTP 500 en cascade (indisponibilite).
+ *
+ * Meme strategie single-flight que `ensureAppDefaults()` : la premiere
+ * requete execute le DDL, les suivantes partagent la meme Promise (O(1)).
+ * Un echec reinitialise le garde (nouvelle tentative) ; l'idempotence
+ * `IF NOT EXISTS` reste valable en scale-out (plusieurs instances).
+ */
+let rateLimitSchemaPromise: Promise<void> | null = null;
+
 export async function ensureRateLimitSchema(): Promise<void> {
-  await postgresRateLimitStore.ensureSchema();
+  if (rateLimitSchemaPromise) return rateLimitSchemaPromise;
+  rateLimitSchemaPromise = postgresRateLimitStore.ensureSchema().catch((e: unknown) => {
+    rateLimitSchemaPromise = null;
+    throw e;
+  });
+  return rateLimitSchemaPromise;
 }
 
 /** Instance de production (store PostgreSQL persistant). */

@@ -34,6 +34,25 @@ function makePool(env: AppEnvironment): Pool {
     // Positionné à l'établissement de chaque connexion : toutes les requêtes
     // non qualifiées résolvent dans le schéma ciblé (isolement réel).
     options: `-c search_path=${searchPath}`,
+    /*
+     * F-23 (re-pentest #2) — Bornage STRICT des connexions par instance.
+     *
+     * Sans `max`, `pg` ouvre jusqu'à 10 connexions par pool ; comme ce module
+     * crée DEUX pools (production + démo) et que Vercel instancie plusieurs
+     * fonctions serverless en parallèle, la consommation agrégée dépassait la
+     * capacité du pooler PostgreSQL de production (mode session, pool_size 15)
+     * → `(EMAXCONNSESSION) max clients reached in session mode` (FATAL, XX000).
+     * Un simple burst concurrent sur un endpoint public provoquait alors des
+     * HTTP 500 en cascade, y compris pour les requêtes isolées suivantes.
+     *
+     * `idleTimeoutMillis` libère les connexions inactives (indispensable en
+     * serverless) et `connectionTimeoutMillis` fait échouer VITE au lieu de
+     * laisser des requêtes suspendues quand la capacité est atteinte.
+     * 4 connexions × 2 pools = 8 < 15 : le pooler garde de la marge.
+     */
+    max: 4,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
   });
 }
 
